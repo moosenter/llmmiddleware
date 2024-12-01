@@ -1,0 +1,11 @@
+fastapi
+sentence_transformers
+faiss-cpu
+python-dotenv
+uvicorn
+pandas
+numpy
+streamlit
+aisuite
+openai
+groq

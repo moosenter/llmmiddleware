@@ -21,14 +21,14 @@ jobs:
       # Step 3: Build and Push Backend Docker Image
       - name: Build and Push Backend
         run: |
-          docker build -t your-dockerhub-username/middleware-backend ./backend
-          docker push your-dockerhub-username/middleware-backend
+          docker build -t moosenter/middleware-backend ./Dockerfile.backend
+          docker push moosenter/middleware-backend
 
       # Step 4: Build and Push Frontend Docker Image
       - name: Build and Push Frontend
         run: |
-          docker build -t your-dockerhub-username/middleware-frontend ./frontend
-          docker push your-dockerhub-username/middleware-frontend
+          docker build -t moosenter/middleware-frontend ./Dockerfile.frontend
+          docker push moosenter/middleware-frontend
 
       # Step 5: Deploy to Remote Server (Optional)
       # - name: Deploy via SSH

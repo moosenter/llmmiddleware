@@ -1,0 +1,44 @@
+name: CI/CD for LLM Middleware App
+
+on:
+  push:
+    branches:
+      - main  # Trigger workflow on pushes to the main branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # Step 3: Build and Push Backend Docker Image
+      - name: Build and Push Backend
+        run: |
+          docker build -t your-dockerhub-username/middleware-backend ./backend
+          docker push your-dockerhub-username/middleware-backend
+
+      # Step 4: Build and Push Frontend Docker Image
+      - name: Build and Push Frontend
+        run: |
+          docker build -t your-dockerhub-username/middleware-frontend ./frontend
+          docker push your-dockerhub-username/middleware-frontend
+
+      # Step 5: Deploy to Remote Server (Optional)
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v0.1.5
+      #   with:
+      #     host: ${{ secrets.SERVER_IP }}
+      #     username: ${{ secrets.SERVER_USER }}
+      #     key: ${{ secrets.SERVER_SSH_KEY }}
+      #     script: |
+      #       cd /path/to/app
+      #       docker-compose pull
+      #       docker-compose down
+      #       docker-compose up -d

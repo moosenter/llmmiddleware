@@ -10,6 +10,7 @@ import time
 import pandas as pd
 import json
 import numpy as np
+from database_processor import database_demo
 load_dotenv()
 
 client = ai.Client(
@@ -21,32 +22,7 @@ client = ai.Client(
 # Initialize the app
 app = FastAPI()
 
-# Load data for retrieval
-knowledge_base = [
-    {"title": "How do I reset my email password?", "content": "Visit the IT portal and click 'Forgot Password.'"},
-    {"title": "What is the reimbursement process?", "content": "Submit receipts on the Finance portal under 'Reimbursements'."},
-    {"title": "Password Reset", "content": "To reset your password, go to the IT portal and click 'Forgot Password'."},
-    {"title": "Reimbursement Process", "content": "Submit your receipts on the Finance portal under 'Reimbursements'."},
-    {"title": "Leave Policy", "content": "The company offers 20 days of paid leave per year."}
-]
-sales_df = pd.read_csv("data_storage/sales_data.csv")
-sales_texts = []
-for _, row in sales_df.iterrows():
-    sales_texts.append(
-        f"Sales Record: Region - {row['Region']}, Product - {row['Product']}, "
-        f"Q1 2023 Sales - {row['Sales Q1 2023']}, Q2 2023 Sales - {row['Sales Q2 2023']}."
-    )
-hr_texts = []
-with open("data_storage/hr_database.jsonl", "r") as file:
-    for line in file:
-        record = json.loads(line)
-        hr_texts.append(
-            f"HR Record: Name - {record['name']}, Position - {record['position']}, "
-            f"Region - {record['region']}."
-        )
-knowledge_texts = [f"title : {item['title']}, content : {item['content']}" for item in knowledge_base] + sales_texts + hr_texts
-print(knowledge_texts)
-print(f"Total Entries: {len(knowledge_texts)}")
+knowledge_texts = database_demo()
 
 st_time = time.time()
 # Initialize FAISS index
@@ -63,6 +39,7 @@ print(f"Number of vectors in FAISS index: {index.ntotal}")
 def retrieve_context(query, top_k=1):
     # Generate embedding for the query
     query_embedding = embedding_model.encode([query])
+    top_k =8
 
     # Search FAISS index
     distances, indices = index.search(query_embedding, k=top_k)
@@ -89,7 +66,8 @@ async def generate_response(request: Request):
         user_prompt = body[-1].get("content", "")
     else:
         role = 'user'
-        user_prompt = body.get("prompt", "")
+        user_prompt = body.get("top_k", "")
+        
 
     # Retrieve context
     context = retrieve_context(user_prompt)

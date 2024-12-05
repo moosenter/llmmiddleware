@@ -1,18 +1,26 @@
-name: CI/CD for LLM Middleware App
+name: CI/CD for LLM Middleware App to AWS ECS
 
 on:
   push:
     branches:
-      - main  # Trigger workflow on pushes to the main branch
+      - main  # Change to your main branch
 
 jobs:
-  build-and-deploy:
+  deploy:
+    name: Build and Deploy to AWS ECS
     runs-on: ubuntu-latest
 
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+      SERVICE_BACKEND: ${{ secrets.SERVICE_BACKEND }}
+      SERVICE_FRONTEND: ${{ secrets.SERVICE_FRONTEND }}
+      ECR_BACKEND: ${{ secrets.ECR_REPOSITORY_BACKEND }}
+      ECR_FRONTEND: ${{ secrets.ECR_REPOSITORY_FRONTEND }}
+
     steps:
-      # Step 1: Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
       # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
@@ -30,15 +38,35 @@ jobs:
           docker build -f ./Dockerfile.frontend -t moosenter/middleware-frontend .
           docker push moosenter/middleware-frontend
 
-      # Step 5: Deploy to Remote Server (Optional)
-      # - name: Deploy via SSH
-      #   uses: appleboy/ssh-action@v0.1.5
-      #   with:
-      #     host: ${{ secrets.SERVER_IP }}
-      #     username: ${{ secrets.SERVER_USER }}
-      #     key: ${{ secrets.SERVER_SSH_KEY }}
-      #     script: |
-      #       cd /path/to/app
-      #       docker-compose pull
-      #       docker-compose down
-      #       docker-compose up -d
+      # Log in to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build and push the backend Docker image
+      - name: Build and Push Backend Image
+        run: |
+          docker build -t $ECR_BACKEND:latest -f backend/Dockerfile ./backend
+          docker push $ECR_BACKEND:latest
+
+      # Build and push the frontend Docker image
+      - name: Build and Push Frontend Image
+        run: |
+          docker build -t $ECR_FRONTEND:latest -f frontend/Dockerfile ./frontend
+          docker push $ECR_FRONTEND:latest
+
+      # Update ECS Service for Backend
+      - name: Update Backend Service
+        run: |
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_BACKEND \
+            --force-new-deployment
+
+      # Update ECS Service for Frontend
+      - name: Update Frontend Service
+        run: |
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_FRONTEND \
+            --force-new-deployment

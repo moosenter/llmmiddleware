@@ -3,3 +3,4 @@ __pycache__
 .env
 aws_deployments
 */.*.db.lock
+volumes

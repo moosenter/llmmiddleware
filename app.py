@@ -34,7 +34,7 @@ def query_llm(model_config, chat_history):
 def stramlit_ui():
     # configured_llms = [{'name':'LLAMA3.2', 'provider':'groq', 'model': 'llama-3.2-3b-preview'}]
     # Load configuration and initialize aisuite client
-    with open("config.yaml", "r") as file:
+    with open("config/AppConfig.yaml", "r") as file:
         config = yaml.safe_load(file)
     configured_llms = config["llms"]
     # Configure Streamlit to use wide mode and hide the top streamlit menu

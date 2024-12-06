@@ -26,6 +26,11 @@ jobs:
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
+      # Log in to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       # Step 3: Build and Push Backend Docker Image
       - name: Build and Push Backend
         run: |
@@ -37,11 +42,6 @@ jobs:
         run: |
           docker build -f ./Dockerfile.frontend -t moosenter/middleware-frontend .
           docker push moosenter/middleware-frontend
-
-      # Log in to Amazon ECR
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
 
       # Build and push the backend Docker image
       - name: Build and Push Backend Image

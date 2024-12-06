@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   frontend:
+    container_name: middleware-frontend
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -8,14 +9,20 @@ services:
       - "8501:8501"  # Map frontend port to host
     depends_on:
       - backend  # Ensure backend starts first
+  
   backend:
+    container_name: middleware-backend
     build:
       context: .
       dockerfile: Dockerfile.backend
     ports:
       - "8000:8000"  # Map backend port to host
+    depends_on:
+      - standalone
+  
   nginx:
     image: nginx:latest
+    container_name: middleware-nginx
     ports:
       - "80:80"
     volumes:
@@ -23,3 +30,51 @@ services:
     depends_on:
       - frontend
       - backend
+  
+  etcd:
+    container_name: middleware-milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.0
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+
+  minio:
+    container_name: middleware-milvus-minio
+    image: minio/minio:RELEASE.2020-12-03T00-03-10Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
+    command: minio server /minio_data
+    ports:
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  standalone:
+    container_name: middleware-milvus-standalone
+    # image: milvusdb/milvus:v2.0.2
+    image: milvusdb/milvus:latest
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+    depends_on:
+      - "etcd"
+      - "minio"
+
+networks:
+  default:
+    name: milvus

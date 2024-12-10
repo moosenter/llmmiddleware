@@ -18,24 +18,40 @@ def database_demo():
         {"title": "Leave Policy", "content": "The company offers 20 days of paid leave per year."}
     ]
 
-    sales_df = pd.read_csv("data_storage/sales_data.csv")
-    sales_texts = []
+    sales_df = pd.read_csv("data_storage/customers.csv")
+    info1 = []
     for _, row in sales_df.iterrows():
-        row_txt = 'Sales Record: '
+        row_txt = 'Customer Record: '
         for key in row.keys():
             row_txt = row_txt + f'{key} - {row[key]}, '
-        sales_texts.append(row_txt)
+        info1.append(row_txt)
 
-    hr_texts = []
-    with open("data_storage/hr_database.jsonl", "r") as file:
-        for line in file:
-            record = json.loads(line)
-            row_txt = 'HR Record: '
-            for key in record.keys():
-                row_txt = row_txt + f'{key} - {record[key]}, '
-            hr_texts.append(row_txt)
+    sales_df = pd.read_csv("data_storage/orders.csv")
+    info2 = []
+    for _, row in sales_df.iterrows():
+        row_txt = 'Order Record: '
+        for key in row.keys():
+            row_txt = row_txt + f'{key} - {row[key]}, '
+        info2.append(row_txt)
 
-    knowledge_texts = [f"title : {item['title']}, content : {item['content']}" for item in knowledge_base] + sales_texts + hr_texts
+    sales_df = pd.read_csv("data_storage/products.csv")
+    info3 = []
+    for _, row in sales_df.iterrows():
+        row_txt = 'Product Record: '
+        for key in row.keys():
+            row_txt = row_txt + f'{key} - {row[key]}, '
+        info3.append(row_txt)
+
+    # hr_texts = []
+    # with open("data_storage/hr_database.jsonl", "r") as file:
+    #     for line in file:
+    #         record = json.loads(line)
+    #         row_txt = 'HR Record: '
+    #         for key in record.keys():
+    #             row_txt = row_txt + f'{key} - {record[key]}, '
+    #         hr_texts.append(row_txt)
+
+    knowledge_texts = [f"title : {item['title']}, content : {item['content']}" for item in knowledge_base] + info1 + info2 + info3
     print(knowledge_texts)
     print(f"Total Entries: {len(knowledge_texts)}")
 
@@ -53,5 +69,6 @@ if __name__ == "__main__":
     db.create_db()
     db.insert_data(embeddings, knowledge_texts)
     db.getAllData()
-    vector = embedding_model.encode('Who is responsible in the North region?')
-    print(db.query_topk(vector, topk=2))
+    vector = embedding_model.encode('Who is top spender?')
+    queries = db.query_topk(vector, topk=2)
+    print(queries)

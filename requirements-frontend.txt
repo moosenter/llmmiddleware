@@ -1,2 +1,5 @@
 streamlit
 pyyaml
+python-fasthtml
+uvicorn
+fastapi

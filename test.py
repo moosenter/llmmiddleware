@@ -1,6 +1,8 @@
 import requests
 
 from pprint import pprint as pp
+# from IPython.display import Markdown
+
 # Set a custom width for pretty-printing
 def pprint(data, width=80):
     """Pretty print data with a specified width."""
@@ -8,9 +10,9 @@ def pprint(data, width=80):
 
 url = "http://localhost:8000/generate"
 data1 = {"prompt": "I forgot email password"}
-data2 = {"prompt": "Who is responsible in the North region?"}
-data3 = {"prompt": "Tell me about sales in Q1 2023 for the North region."}
-data4 = {"prompt": "Tell me about sales in Q4 2024 for the South region."}
+data2 = {"prompt": "What product is the most profitable?"}
+data3 = {"prompt": "Who can make the most sales?"}
+data4 = {"prompt": "Tell then lastest sale product?"}
 response = requests.post(url, json=data1)
 pprint(response.json())
 response = requests.post(url, json=data2)

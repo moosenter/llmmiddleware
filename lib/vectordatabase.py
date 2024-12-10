@@ -53,6 +53,7 @@ class VectorDB():
         print(f"------ Inserted {len(embeddings)} vectors into the collection '{self.collection_name}'. ------")
 
     def query_topk(self, query_vector, topk=5):
+
         results = self.collection.search(
             data=[query_vector],
             anns_field="embedding",
@@ -65,6 +66,7 @@ class VectorDB():
         return retrieved_docs
     
     def getAllData(self):
+
         # Query all data from the collection
         results = self.collection.query(
             limit=1000,

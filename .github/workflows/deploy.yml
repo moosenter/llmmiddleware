@@ -26,10 +26,10 @@ jobs:
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-      # Log in to Amazon ECR
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+      # # Log in to Amazon ECR
+      # - name: Login to Amazon ECR
+      #   id: login-ecr
+      #   uses: aws-actions/amazon-ecr-login@v1
 
       # Step 3: Build and Push Backend Docker Image
       - name: Build and Push Backend
@@ -43,30 +43,30 @@ jobs:
           docker build -f ./Dockerfile.frontend -t moosenter/middleware-frontend .
           docker push moosenter/middleware-frontend
 
-      # Build and push the backend Docker image
-      - name: Build and Push Backend Image
-        run: |
-          docker build -t $ECR_BACKEND:latest -f backend/Dockerfile ./backend
-          docker push $ECR_BACKEND:latest
+      # # Build and push the backend Docker image
+      # - name: Build and Push Backend Image
+      #   run: |
+      #     docker build -t $ECR_BACKEND:latest -f backend/Dockerfile ./backend
+      #     docker push $ECR_BACKEND:latest
 
-      # Build and push the frontend Docker image
-      - name: Build and Push Frontend Image
-        run: |
-          docker build -t $ECR_FRONTEND:latest -f frontend/Dockerfile ./frontend
-          docker push $ECR_FRONTEND:latest
+      # # Build and push the frontend Docker image
+      # - name: Build and Push Frontend Image
+      #   run: |
+      #     docker build -t $ECR_FRONTEND:latest -f frontend/Dockerfile ./frontend
+      #     docker push $ECR_FRONTEND:latest
 
-      # Update ECS Service for Backend
-      - name: Update Backend Service
-        run: |
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_BACKEND \
-            --force-new-deployment
+      # # Update ECS Service for Backend
+      # - name: Update Backend Service
+      #   run: |
+      #     aws ecs update-service \
+      #       --cluster $CLUSTER_NAME \
+      #       --service $SERVICE_BACKEND \
+      #       --force-new-deployment
 
-      # Update ECS Service for Frontend
-      - name: Update Frontend Service
-        run: |
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_FRONTEND \
-            --force-new-deployment
+      # # Update ECS Service for Frontend
+      # - name: Update Frontend Service
+      #   run: |
+      #     aws ecs update-service \
+      #       --cluster $CLUSTER_NAME \
+      #       --service $SERVICE_FRONTEND \
+      #       --force-new-deployment

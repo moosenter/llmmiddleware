@@ -18,8 +18,10 @@ client = ai.Client()
 app = FastAPI()
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
+t0 = time.time()
 db = VectorDB(database_path='data_storage/democompany.db')
 db.getCollection()
+print(f'database reading time: {time.time() - t0} s')
 # db.getAllData()
 
 # def faiss_retrieve_context(query, top_k=2):
@@ -40,21 +42,8 @@ db.getCollection()
 def retrieve_context(query, top_k=5):
     # Generate embedding for the query
     query_embedding = embedding_model.encode(query)
-
     retrieved_texts = db.query_topk(query_embedding, topk=top_k)
-    print(retrieved_texts)
-
-    # Retrieve matching content
-    results = []
-    for retrieved_text in retrieved_texts:
-        if "HR Record" in retrieved_text and "hr" in query.lower() or "who" in query.lower():
-            results.append({"type": "HR", "content": retrieved_text})
-        elif "Sales Record" in retrieved_text and "sales" in query.lower():
-            results.append({"type": "Sales", "content": retrieved_text})
-        else:
-            results.append({"type": "General", "content": retrieved_text})
-    
-    return results
+    return retrieved_texts
 
 # Middleware endpoint
 @app.post("/generate")
@@ -85,16 +74,22 @@ async def generate_response(request: Request):
             ]
     print(messages)
 
-    response = client.chat.completions.create(
-        messages=messages,
-        model='groq:llama-3.2-3b-preview'
-    )
-    
-    # Return response
-    return {
-        'statusCode' : 200,
-        "response": response.choices[0].message.content
-    }
+    try:
+        response = client.chat.completions.create(
+            messages=messages,
+            model='groq:llama-3.2-3b-preview',
+        )
+        
+        return {
+            'statusCode' : 200,
+            "response": response.choices[0].message.content
+        }
+    except Exception as e:
+
+        return {
+            'statusCode' : 413,
+            "response": str(e)
+        }
 
 if __name__ == "__main__":
     uvicorn.run("middleware:app", host="0.0.0.0",port=8000, log_level="info")

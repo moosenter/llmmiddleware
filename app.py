@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import yaml
+import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 # Function to display chat history
 def display_chat_history(chat_history, model_name):
@@ -30,6 +32,15 @@ def query_llm(model_config, chat_history):
     except Exception as e:
         st.error(f"Error querying {model_config['name']}: {e}")
         return "Error with LLM response."
+    
+def query_llm_and_append_to_history(model_config, chat_history):
+    response = query_llm(model_config, chat_history)
+    chat_history.append({"role": "assistant", "content": response})
+    st.session_state.chat_history.append(chat_history)
+    # Reset processing state
+    st.session_state.is_processing = False
+    st.rerun()
+    return "Success"
 
 def stramlit_ui():
     # configured_llms = [{'name':'LLAMA3.2', 'provider':'groq', 'model': 'llama-3.2-3b-preview'}]
@@ -41,7 +52,7 @@ def stramlit_ui():
     st.set_page_config(layout="wide", menu_items={})
     # Add heading with padding
     st.markdown(
-        "<div style='padding-top: 1rem;'><h2 style='text-align: center; color: #ffffff;'>Chat & Compare LLM responses</h2></div>",
+        "<div style='padding-top: 1rem;'><h2 style='text-align: center; color: #ffffff;font-size:50px;'>Chat & Compare LLM responses</h2></div>",
         unsafe_allow_html=True,
     )
     st.markdown(
@@ -49,7 +60,7 @@ def stramlit_ui():
         <style>
             /* Apply default font size globally */
             html, body, [class*="css"] {
-                font-size: 14px !important;
+                font-size: 20px !important;
             }
             
             /* Style for Reset button focus */
@@ -102,7 +113,7 @@ def stramlit_ui():
                 margin: 10px 0;
                 padding: 10px;
             }
-            
+
             #text_area_1 {
                 min-height: 20px !important;
             } 
@@ -149,20 +160,23 @@ def stramlit_ui():
     if st.session_state.use_comparison_mode:
         col1, col2 = st.columns(2)
         with col1:
-            chat_container = st.container(height=500)
+            chat_container = st.container(height=700)
             with chat_container:
                 display_chat_history(st.session_state.chat_history_1, selected_model_1)
         with col2:
-            chat_container = st.container(height=500)
+            chat_container = st.container(height=700)
             with chat_container:
                 display_chat_history(st.session_state.chat_history_2, selected_model_2)
     else:
-        chat_container = st.container(height=500)
+        chat_container = st.container(height=700)
         with chat_container:
             display_chat_history(st.session_state.chat_history_1, selected_model_1)
 
     # Bottom Section - User Input
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+
+    if "query_input" not in st.session_state:
+        st.session_state.query_input = ""
 
     col1, col2, col3 = st.columns([6, 1, 1])
     with col1:
@@ -171,7 +185,7 @@ def stramlit_ui():
             label_visibility="collapsed",
             placeholder="Enter your query...",
             key="query_input",
-            height=70,
+            height=100
         )
 
     # CSS for aligning buttons with the bottom of the text area
@@ -207,6 +221,7 @@ def stramlit_ui():
         if st.button("Reset Chat", use_container_width=True):
             st.session_state.chat_history_1 = []
             st.session_state.chat_history_2 = []
+            st.session_state.is_processing = False
             st.rerun()
 
     # Handle send button click and processing
@@ -224,24 +239,43 @@ def stramlit_ui():
     # Handle the actual processing
     if st.session_state.is_processing and user_query:
         # Query the selected LLM(s)
-        model_config_1 = next(
-            llm for llm in configured_llms if llm["name"] == selected_model_1
-        )
-        response_1 = query_llm(model_config_1, st.session_state.chat_history_1)
-        st.session_state.chat_history_1.append({"role": "assistant", "content": response_1})
-
-        if st.session_state.use_comparison_mode:
-            model_config_2 = next(
-                llm for llm in configured_llms if llm["name"] == selected_model_2
+        with ThreadPoolExecutor() as executor:
+            model_config_1 = next(
+                llm for llm in configured_llms if llm["name"] == selected_model_1
             )
-            response_2 = query_llm(model_config_2, st.session_state.chat_history_2)
-            st.session_state.chat_history_2.append(
-                {"role": "assistant", "content": response_2}
-            )
-
-        # Reset processing state
-        st.session_state.is_processing = False
-        st.rerun()
+            future_1 = executor.submit(query_llm_and_append_to_history, model_config_1, st.session_state.chat_history_1)
+            # response_1 = query_llm(model_config_1, st.session_state.chat_history_1)
+            try:
+                future_1.result(timeout=30)
+                # st.session_state.chat_history_1.append({"role": "assistant", "content": response_1})
+            except TimeoutError:
+                st.error("Process stopped: It took too long to complete.")
+                st.session_state.is_processing = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
+                # Reset processing state
+                st.session_state.is_processing = False
+                st.rerun()
+            
+            if st.session_state.use_comparison_mode:
+                model_config_2 = next(
+                    llm for llm in configured_llms if llm["name"] == selected_model_2
+                )
+                future_2 = executor.submit(query_llm_and_append_to_history, model_config_2, st.session_state.chat_history_2)
+                # response_2 = query_llm(model_config_2, st.session_state.chat_history_2)
+                try:
+                    future_2.result(timeout=30)
+                except TimeoutError:
+                    st.error("Process stopped: It took too long to complete.")
+                    st.session_state.is_processing = False
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
+                    # Reset processing state
+                    st.session_state.is_processing = False
+                    st.rerun()
+        
 
 if __name__ == "__main__":
     stramlit_ui()

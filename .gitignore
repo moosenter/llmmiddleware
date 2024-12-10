@@ -4,3 +4,5 @@ __pycache__
 aws_deployments
 */.*.db.lock
 volumes/
+.sesskey
+demo_deployments/

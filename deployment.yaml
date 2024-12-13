@@ -20,12 +20,20 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: middleware-frontend:latest # Replace with your built image
+          image: middleware-frontend
           ports:
             - containerPort: 8501
           env:
             - name: API_URL
-              value: "http://backend:8000"
+              value: "http://backend-service.middleware-namespace:8000"
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
@@ -37,9 +45,10 @@ spec:
     app: frontend
   ports:
     - protocol: TCP
-      port: 8501
+      port: 80
       targetPort: 8501
-  type: NodePort
+  type: LoadBalancer
+  loadBalancerIP: 192.168.1.110
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,14 +67,22 @@ spec:
     spec:
       containers:
         - name: backend
-          image: middleware-backend:latest # Replace with your built image
+          image: middleware-backend
           ports:
             - containerPort: 8000
           env:
             - name: MINIO_URL
-              value: "http://minio:9000"
+              value: "http://minio-service.middleware-namespace:9000"
             - name: MILVUS_URL
-              value: "http://standalone:19530"
+              value: "http://standalone-service.middleware-namespace:19530"
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
@@ -105,6 +122,14 @@ spec:
             - name: nginx-config
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
       volumes:
         - name: nginx-config
           configMap:
@@ -148,6 +173,14 @@ spec:
           volumeMounts:
             - name: etcd-data
               mountPath: /etcd
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
       volumes:
         - name: etcd-data
           emptyDir: {}
@@ -194,6 +227,14 @@ spec:
           volumeMounts:
             - name: minio-data
               mountPath: /minio_data
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
       volumes:
         - name: minio-data
           emptyDir: {}
@@ -235,12 +276,20 @@ spec:
             - containerPort: 19530
           env:
             - name: ETCD_ENDPOINTS
-              value: "etcd:2379"
+              value: "etcd-service.middleware-namespace:2379"
             - name: MINIO_ADDRESS
-              value: "minio:9000"
+              value: "minio-service.middleware-namespace:9000"
           volumeMounts:
             - name: milvus-data
               mountPath: /var/lib/milvus
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
       volumes:
         - name: milvus-data
           emptyDir: {}
@@ -258,3 +307,16 @@ spec:
       port: 19530
       targetPort: 19530
   type: NodePort
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: layer2
+      addresses:
+      - 192.168.1.1-192.168.1.254

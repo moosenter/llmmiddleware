@@ -6,3 +6,4 @@ aws_deployments
 volumes/
 .sesskey
 demo_deployments/
+.DS_Store

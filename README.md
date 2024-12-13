@@ -17,7 +17,3 @@ docker-compose build
 docker-compose up -d
 ````
 4. open `http://localhost:8501`
-
-## RAG database implementation is under maintenance
-
-## Now only support LLAMA

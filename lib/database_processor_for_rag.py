@@ -64,7 +64,7 @@ if __name__ == "__main__":
     embeddings = embedding_model.encode(knowledge_texts, show_progress_bar=True)
     print(f'encoding time: {time.time() - st_time} s')
 
-    db = VectorDB(database_path= "data_storage/democompany.db")
+    db = VectorDB(database_path= "data_storage/democompany-vector.db")
     db.drop_collection()
     db.create_db()
     db.insert_data(embeddings, knowledge_texts)

@@ -10,7 +10,7 @@ import time
 import pandas as pd
 import json
 import numpy as np
-from lib.database_processor import database_demo
+from lib.database_processor_for_rag import database_demo
 from lib.vectordatabase import VectorDB
 load_dotenv()
 
@@ -19,10 +19,9 @@ app = FastAPI()
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 t0 = time.time()
-db = VectorDB(database_path='data_storage/democompany.db')
+db = VectorDB(database_path='data_storage/democompany-vector.db')
 db.getCollection()
 print(f'database reading time: {time.time() - t0} s')
-# db.getAllData()
 
 # def faiss_retrieve_context(query, top_k=2):
 #     # Search FAISS index
@@ -44,6 +43,16 @@ def retrieve_context(query, top_k=5):
     query_embedding = embedding_model.encode(query)
     retrieved_texts = db.query_topk(query_embedding, topk=top_k)
     return retrieved_texts
+
+@app.post("/model")
+async def generate_response(request: Request):
+    global model
+    body = await request.json()
+    model = body.get("model")
+    return {
+            'statusCode' : 200,
+            "response": model
+    } 
 
 # Middleware endpoint
 @app.post("/generate")
@@ -77,7 +86,8 @@ async def generate_response(request: Request):
     try:
         response = client.chat.completions.create(
             messages=messages,
-            model='groq:llama-3.2-3b-preview',
+            # model='groq:llama-3.2-3b-preview',
+            model=model
         )
         
         return {

@@ -10,3 +10,7 @@ aisuite
 openai
 groq
 pymilvus
+langchain
+langchain-community
+langchain_groq
+langchain_openai

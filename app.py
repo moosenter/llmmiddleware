@@ -3,6 +3,7 @@ import requests
 import yaml
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import os
 
 # Function to display chat history
 def display_chat_history(chat_history, model_name):
@@ -22,8 +23,10 @@ def query_llm(model_config, chat_history):
     try:
         model = model_config["provider"] + ":" + model_config["model"]
         try:
-            response = requests.post('http://backend:8000/generate', json=chat_history).json()['response']
+            model_response = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/model', json={'model':model}).json()['response']
+            response = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/generate', json=chat_history).json()['response']
         except:
+            model_response = requests.post('http://localhost:8000/model', json={'model':model}).json()['response']
             response = requests.post('http://localhost:8000/generate', json=chat_history).json()['response']
         print(
             f"Response from {model_config['name']}: {response}"
@@ -36,10 +39,11 @@ def query_llm(model_config, chat_history):
 def query_llm_and_append_to_history(model_config, chat_history):
     response = query_llm(model_config, chat_history)
     chat_history.append({"role": "assistant", "content": response})
-    st.session_state.chat_history.append(chat_history)
+    if str(chat_history) == "st.session_state.chat_history_1":
+        st.session_state.chat_history_1.append(chat_history)
+    if str(chat_history) == "st.session_state.chat_history_2":
+        st.session_state.chat_history_2.append(chat_history)
     # Reset processing state
-    st.session_state.is_processing = False
-    st.rerun()
     return "Success"
 
 def stramlit_ui():
@@ -51,16 +55,16 @@ def stramlit_ui():
     # Configure Streamlit to use wide mode and hide the top streamlit menu
     st.set_page_config(layout="wide", menu_items={})
     # Add heading with padding
-    st.markdown(
-        "<div style='padding-top: 1rem;'><h2 style='text-align: center; color: #ffffff;font-size:50px;'>Chat & Compare LLM responses</h2></div>",
-        unsafe_allow_html=True,
-    )
+    # st.markdown(
+    #     "<div style='padding-top: 1rem;'><h2 style='text-align: center; color: #ffffff;font-size:25px;'>Chat & Compare LLM responses</h2></div>",
+    #     unsafe_allow_html=True,
+    # )
     st.markdown(
         """
         <style>
             /* Apply default font size globally */
             html, body, [class*="css"] {
-                font-size: 20px !important;
+                font-size: 16px !important;
             }
             
             /* Style for Reset button focus */
@@ -160,15 +164,15 @@ def stramlit_ui():
     if st.session_state.use_comparison_mode:
         col1, col2 = st.columns(2)
         with col1:
-            chat_container = st.container(height=700)
+            chat_container = st.container(height=500)
             with chat_container:
                 display_chat_history(st.session_state.chat_history_1, selected_model_1)
         with col2:
-            chat_container = st.container(height=700)
+            chat_container = st.container(height=500)
             with chat_container:
                 display_chat_history(st.session_state.chat_history_2, selected_model_2)
     else:
-        chat_container = st.container(height=700)
+        chat_container = st.container(height=500)
         with chat_container:
             display_chat_history(st.session_state.chat_history_1, selected_model_1)
 
@@ -194,12 +198,12 @@ def stramlit_ui():
         <style>
             /* Adjust the container of the buttons to align at the bottom */
             .stButton > button {
-                margin-top: 35px !important; /* Adjust the margin to align */
+                margin-top: 5px !important; /* Adjust the margin to align */
             }
 
             /* Align buttons and "Processing..." text to the bottom of the text area */
             .button-container {
-                margin-top: 42px !important;
+                margin-top: 5px !important;
                 text-align: center; /* Center-aligns "Processing..." */
             }
         </style>
@@ -275,6 +279,9 @@ def stramlit_ui():
                     # Reset processing state
                     st.session_state.is_processing = False
                     st.rerun()
+
+            st.session_state.is_processing = False
+            st.rerun()
         
 
 if __name__ == "__main__":

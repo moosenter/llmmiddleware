@@ -9,8 +9,13 @@ streamlit
 aisuite
 openai
 groq
+anthropic
 pymilvus
 langchain
 langchain-community
 langchain_groq
 langchain_openai
+vanna
+pymilvus[model]
+pydantic
+orjson

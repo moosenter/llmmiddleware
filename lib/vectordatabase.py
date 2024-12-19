@@ -27,6 +27,12 @@ class VectorDB():
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=embeding_size),
             FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=max_length)
         ]
+        # fields = [
+        #     FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, auto_id=True, max_length=65535),
+        #     FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=embeding_size),
+        #     FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
+        #     FieldSchema(name="sql", dtype=DataType.VARCHAR, max_length=65535)
+        # ]
         self.schema = CollectionSchema(fields, description="Knowledge Base Collection")
         self.index_params = {
             "index_type": "HNSW",  # Use IVF or HNSW for large datasets
@@ -43,7 +49,7 @@ class VectorDB():
     def getCollection(self):
         self.collection = Collection(self.collection_name)
     
-    def insert_data(self, embeddings, texts):
+    def insert_data(self, embeddings, texts, sql):
 
         # Insert data into the collection
         data = [embeddings, texts]  # Milvus expects data in columnar format

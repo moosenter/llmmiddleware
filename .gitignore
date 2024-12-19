@@ -7,3 +7,8 @@ volumes/
 .sesskey
 demo_deployments/
 .DS_Store
+milvus.db
+.milvus.db.lock
+*.db
+*.sqlite
+.*.db.lock

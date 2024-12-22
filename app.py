@@ -1,293 +1,345 @@
-import streamlit as st
-import requests
-import yaml
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import streamlit as st
+import uuid
+import requests
 import os
+import yaml
+import orjson
+import pandas as pd
+import plotly.io as pio
 
-# Function to display chat history
-def display_chat_history(chat_history, model_name):
-    for message in chat_history:
-        role_display = "User" if message["role"] == "user" else model_name
-        role = "user" if message["role"] == "user" else "assistant"
-        if role == "user":
-            with st.chat_message(role, avatar="👤"):
-                st.write(message["content"])
-        else:
-            with st.chat_message(role, avatar="🤖"):
-                st.write(message["content"])
+avatar_url = "frontend/assets/middleware_icon.png"
 
-# Helper function to query each LLM
-def query_llm(model_config, chat_history):
-    print(f"Querying {model_config['name']} with {chat_history}")
-    try:
-        model = model_config["provider"] + ":" + model_config["model"]
-        try:
-            model_response = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/model', json={'model':model}).json()['response']
-            response = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/generate', json=chat_history).json()['response']
-        except:
-            model_response = requests.post('http://localhost:8000/model', json={'model':model}).json()['response']
-            response = requests.post('http://localhost:8000/generate', json=chat_history).json()['response']
-        print(
-            f"Response from {model_config['name']}: {response}"
-        )
-        return response
-    except Exception as e:
-        st.error(f"Error querying {model_config['name']}: {e}")
-        return "Error with LLM response."
+def set_question(question):
+    st.session_state["my_question"] = question
     
-def query_llm_and_append_to_history(model_config, chat_history):
-    response = query_llm(model_config, chat_history)
-    chat_history.append({"role": "assistant", "content": response})
-    if str(chat_history) == "st.session_state.chat_history_1":
-        st.session_state.chat_history_1.append(chat_history)
-    if str(chat_history) == "st.session_state.chat_history_2":
-        st.session_state.chat_history_2.append(chat_history)
-    # Reset processing state
-    return "Success"
+def reset_button():
+    st.session_state["my_question"] = None
+    st.session_state.chat_history_1 = []
+    # st.session_state.chat_history_2 = []
+    # st.session_state.is_processing = False
+    st.session_state.run_once_flag = False
+    # st.experimental_rerun()
+
+def writeResults():
+    for message in st.session_state.chat_history_1:
+        if message["role"] == "assistant":
+            with st.chat_message(message["role"], avatar=avatar_url,):
+                st.markdown(message["content"])
+            if 'table' in message:
+                with st.chat_message(message["role"], avatar=avatar_url,):
+                    df = message['table']
+                    if len(df) > 10:
+                        st.write("First 10 rows of data")
+                        st.dataframe(df.head(10))
+                    else:
+                        st.dataframe(df)
+            if 'chart' in message:
+                with st.chat_message(message["role"], avatar=avatar_url,):
+                    st.plotly_chart(message['chart'], key=f"chart_{str(uuid.uuid4())}")
+        else:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
 def stramlit_ui():
-    # configured_llms = [{'name':'LLAMA3.2', 'provider':'groq', 'model': 'llama-3.2-3b-preview'}]
-    # Load configuration and initialize aisuite client
-    with open("config/AppConfig.yaml", "r") as file:
+    with open("config/ModelConfig.yaml", "r") as file:
         config = yaml.safe_load(file)
     configured_llms = config["llms"]
-    # Configure Streamlit to use wide mode and hide the top streamlit menu
-    st.set_page_config(layout="wide", menu_items={})
-    # Add heading with padding
-    # st.markdown(
-    #     "<div style='padding-top: 1rem;'><h2 style='text-align: center; color: #ffffff;font-size:25px;'>Chat & Compare LLM responses</h2></div>",
-    #     unsafe_allow_html=True,
-    # )
-    st.markdown(
-        """
-        <style>
-            /* Apply default font size globally */
-            html, body, [class*="css"] {
-                font-size: 16px !important;
-            }
-            
-            /* Style for Reset button focus */
-            button[data-testid="stButton"][aria-label="Reset Chat"]:focus {
-                border-color: red !important;
-                box-shadow: 0 0 0 2px red !important;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
-        <style>
-            /* Hide Streamlit's default top bar */
-            #MainMenu {visibility: hidden;}
-            header {visibility: hidden;}
-            footer {visibility: hidden;}
-            
-            /* Remove top padding/margin */
-            .block-container {
-                padding-top: 0rem;
-                padding-bottom: 0rem;
-                margin-top: 0rem;
-            }
-
-            /* Remove padding from the app container */
-            .appview-container {
-                padding-top: 0rem;
-            }
-            
-            /* Custom CSS for scrollable chat container */
-            .chat-container {
-                height: 650px;
-                overflow-y: auto !important;
-                background-color: #1E1E1E;
-                border: 1px solid #333;
-                border-radius: 10px;
-                padding: 20px;
-                margin: 10px 0;
-            }
-            
-            /* Ensure the container takes full width */
-            .stMarkdown {
-                width: 100%;
-            }
-            
-            /* Style for chat messages to ensure they're visible */
-            .chat-message {
-                margin: 10px 0;
-                padding: 10px;
-            }
-
-            #text_area_1 {
-                min-height: 20px !important;
-            } 
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
     # Initialize session states
     if "chat_history_1" not in st.session_state:
         st.session_state.chat_history_1 = []
-    if "chat_history_2" not in st.session_state:
-        st.session_state.chat_history_2 = []
-    if "is_processing" not in st.session_state:
-        st.session_state.is_processing = False
+    # if "chat_history_2" not in st.session_state:
+    #     st.session_state.chat_history_2 = []
+    # if "is_processing" not in st.session_state:
+    #     st.session_state.is_processing = False
     if "use_comparison_mode" not in st.session_state:
         st.session_state.use_comparison_mode = False
+    if "run_once_flag" not in st.session_state:
+        st.session_state["run_once_flag"] = False
 
-    # Top Section - Controls
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.session_state.use_comparison_mode = st.checkbox("Comparison Mode", value=False)
+    st.set_page_config(layout="wide")
 
-    # Move LLM selection below comparison mode checkbox - now in columns
-    llm_col1, llm_col2 = st.columns(2)
-    with llm_col1:
-        selected_model_1 = st.selectbox(
-            "Choose LLM Model 1",
-            [llm["name"] for llm in configured_llms],
-            key="model_1",
-            index=0 if configured_llms else 0,
-        )
-    with llm_col2:
-        if st.session_state.use_comparison_mode:
-            selected_model_2 = st.selectbox(
-                "Choose LLM Model 2",
-                [llm["name"] for llm in configured_llms],
-                key="model_2",
-                index=1 if len(configured_llms) > 1 else 0,
-            )
-
-    # Display Chat Histories first, always
-    # Middle Section - Display Chat Histories
-    if st.session_state.use_comparison_mode:
-        col1, col2 = st.columns(2)
-        with col1:
-            chat_container = st.container(height=500)
-            with chat_container:
-                display_chat_history(st.session_state.chat_history_1, selected_model_1)
-        with col2:
-            chat_container = st.container(height=500)
-            with chat_container:
-                display_chat_history(st.session_state.chat_history_2, selected_model_2)
-    else:
-        chat_container = st.container(height=500)
-        with chat_container:
-            display_chat_history(st.session_state.chat_history_1, selected_model_1)
-
-    # Bottom Section - User Input
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-
-    if "query_input" not in st.session_state:
-        st.session_state.query_input = ""
-
-    col1, col2, col3 = st.columns([6, 1, 1])
-    with col1:
-        user_query = st.text_area(
-            label="Enter your query",
-            label_visibility="collapsed",
-            placeholder="Enter your query...",
-            key="query_input",
-            height=100
-        )
-
-    # CSS for aligning buttons with the bottom of the text area
     st.markdown(
-        """
-        <style>
-            /* Adjust the container of the buttons to align at the bottom */
-            .stButton > button {
-                margin-top: 5px !important; /* Adjust the margin to align */
-            }
+            """
+            <style>
+                /* Apply default font size globally */
+                html, body, [class*="css"] {
+                    font-size: 16px !important;
+                }
+                
+                /* Style for Reset button focus */
+                button[data-testid="stButton"][aria-label="Reset Chat"]:focus {
+                    border-color: red !important;
+                    box-shadow: 0 0 0 2px red !important;
+                }
+            </style>
+            """,
+            unsafe_allow_html=True,
+    )
+    st.markdown(
+            """
+            <style>
+                /* Hide Streamlit's default top bar */
+                #MainMenu {visibility: hidden;}
+                header {visibility: hidden;}
+                footer {visibility: hidden;}
+                
+                /* Remove top padding/margin */
+                .block-container {
+                    padding-top: 0rem;
+                    padding-bottom: 0rem;
+                    margin-top: 0rem;
+                }
 
-            /* Align buttons and "Processing..." text to the bottom of the text area */
-            .button-container {
-                margin-top: 5px !important;
-                text-align: center; /* Center-aligns "Processing..." */
-            }
-        </style>
-        """,
-        unsafe_allow_html=True,
+                /* Remove padding from the app container */
+                .appview-container {
+                    padding-top: 0rem;
+                }
+                
+                /* Custom CSS for scrollable chat container */
+                .chat-container {
+                    height: 650px;
+                    overflow-y: auto !important;
+                    background-color: #1E1E1E;
+                    border: 1px solid #333;
+                    border-radius: 10px;
+                    padding: 20px;
+                    margin: 10px 0;
+                }
+                
+                /* Ensure the container takes full width */
+                .stMarkdown {
+                    width: 100%;
+                }
+                
+                /* Style for chat messages to ensure they're visible */
+                .chat-message {
+                    margin: 10px 0;
+                    padding: 10px;
+                }
+
+                #text_area_1 {
+                    min-height: 20px !important;
+                } 
+            </style>
+            """,
+            unsafe_allow_html=True,
     )
 
-    with col2:
-        send_button = False  # Initialize send_button
-        if st.session_state.is_processing:
-            st.markdown(
-                "<div class='button-container'>Processing... ⏳</div>",
-                unsafe_allow_html=True,
+    st.sidebar.title("Output Settings")
+    st.sidebar.checkbox("Show SQL", value=True, key="show_sql")
+    st.sidebar.checkbox("Show Table", value=True, key="show_table")
+    st.sidebar.checkbox("Show Plotly Code", value=True, key="show_plotly_code")
+    st.sidebar.checkbox("Show Chart", value=True, key="show_chart")
+    st.sidebar.checkbox("Show Summary", value=True, key="show_summary")
+    st.sidebar.checkbox("Show Follow-up Questions", value=True, key="show_followup")
+    st.sidebar.button("Reset", on_click=lambda: reset_button(), use_container_width=True)
+
+    st.title("LLM Middleware")
+    st.sidebar.write(st.session_state)
+
+    selected_model_1 = st.selectbox(
+        "Choose LLM Model 1",
+        [llm["name"] for llm in configured_llms],
+        key="model_1",
+        index=0 if configured_llms else 0,
+    )
+    model_config_1 = next(
+        llm for llm in configured_llms if llm["name"] == selected_model_1
+    )
+    with open("config/AppConfig.yaml", "r") as file:
+        configs = yaml.safe_load(file)
+    configs = configs["vannaconf"]
+    configs.update({'model':model_config_1["provider"] + ":" + model_config_1["model"]})
+
+    if st.session_state["run_once_flag"] is False:
+        st.session_state["run_once_flag"] = True
+        try:
+            questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/setup_vanna/', json={'configs': configs}).json()['response']
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error fetching data: {e}")
+            return None
+
+    assistant_message_suggested = st.chat_message(
+        "assistant", avatar=avatar_url
+    )
+    if assistant_message_suggested.button("Click to show suggested questions"):
+        st.session_state["my_question"] = None
+        # questions = generate_questions_cached(configs)
+        try:
+            questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_questions_cached/', json={'configs': configs}).json()['response']
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error fetching data: {e}")
+            return None
+        for i, question in enumerate(questions):
+            time.sleep(0.05)
+            button = st.button(
+                question,
+                on_click=set_question,
+                args=(question,),
+                key=str(uuid.uuid4())
             )
-        else:
-            send_button = st.button("Send Query", use_container_width=True)
 
-    with col3:
-        if st.button("Reset Chat", use_container_width=True):
-            st.session_state.chat_history_1 = []
-            st.session_state.chat_history_2 = []
-            st.session_state.is_processing = False
-            st.rerun()
+    my_question = st.session_state.get("my_question", default=None)
+    # if st.session_state.is_processing == False:
+    if my_question is None:
+        my_question = st.chat_input(
+            "Ask me a question about your data",
+        )
 
-    # Handle send button click and processing
-    if send_button and user_query and not st.session_state.is_processing:
-        # Set processing state
-        st.session_state.is_processing = True
+    if my_question:
+        # st.session_state.is_processing = True
+        st.session_state["my_question"] = my_question
+        st.session_state.chat_history_1.append({"role": "user", "content": my_question})
 
-        # Append user's message to chat histories first
-        st.session_state.chat_history_1.append({"role": "user", "content": user_query})
-        if st.session_state.use_comparison_mode:
-            st.session_state.chat_history_2.append({"role": "user", "content": user_query})
+        # sql = generate_sql_cached(question=my_question)
+        try:
+            sql = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_sql_cached/', json={'question': my_question}).json()['response']
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error fetching data: {e}")
+            return None
 
-        st.rerun()
-    
-    # Handle the actual processing
-    if st.session_state.is_processing and user_query:
-        # Query the selected LLM(s)
-        with ThreadPoolExecutor() as executor:
-            model_config_1 = next(
-                llm for llm in configured_llms if llm["name"] == selected_model_1
-            )
-            future_1 = executor.submit(query_llm_and_append_to_history, model_config_1, st.session_state.chat_history_1)
-            # response_1 = query_llm(model_config_1, st.session_state.chat_history_1)
-            try:
-                future_1.result(timeout=30)
-                # st.session_state.chat_history_1.append({"role": "assistant", "content": response_1})
-            except TimeoutError:
-                st.error("Process stopped: It took too long to complete.")
-                st.session_state.is_processing = False
-                st.rerun()
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-                # Reset processing state
-                st.session_state.is_processing = False
-                st.rerun()
-            
-            if st.session_state.use_comparison_mode:
-                model_config_2 = next(
-                    llm for llm in configured_llms if llm["name"] == selected_model_2
-                )
-                future_2 = executor.submit(query_llm_and_append_to_history, model_config_2, st.session_state.chat_history_2)
-                # response_2 = query_llm(model_config_2, st.session_state.chat_history_2)
-                try:
-                    future_2.result(timeout=30)
-                except TimeoutError:
-                    st.error("Process stopped: It took too long to complete.")
-                    st.session_state.is_processing = False
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-                    # Reset processing state
-                    st.session_state.is_processing = False
-                    st.rerun()
-
-            st.session_state.is_processing = False
-            st.rerun()
+        try:
+            is_sql_valid = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/is_sql_valid_cached/', json={'sql': sql}).json()['response']
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error fetching data: {e}")
+            return None
         
+        if sql and is_sql_valid:
+            writeResults()
+
+            st.session_state.chat_history_1.append({"role": "assistant", "content": f"SQL generated:\n```sql\n{sql}\n```"})
+
+            # df = run_sql_cached(sql=sql)
+            try:
+                df = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/run_sql_cached/', 
+                                   json={'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8")}).json()['response']
+                try:
+                    df = orjson.loads(df)
+                except orjson.JSONDecodeError as e:
+                    print(f"JSON decoding failed: {e}")
+                df = pd.read_json(df)
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error fetching data: {e}")
+                return None
+
+            if df is not None:
+                st.session_state["df"] = df
+
+            if st.session_state.get("df") is not None:
+                if st.session_state.get("show_table", True):
+                    st.write("### Query Results")
+                    if len(df) > 10:
+                        st.write("First 10 rows of data")
+                        st.dataframe(df.head(10))
+                    else:
+                        st.dataframe(df)
+                    st.session_state.chat_history_1.append({"role": "assistant", "content": "### Query Table", 'table':df})
+
+                try:
+                    should_generate_chart = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/should_generate_chart_cached/', 
+                                    json={
+                                        'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                    }).json()['response']
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Error fetching data: {e}")
+                    return None
+        
+                # if should_generate_chart_cached(question=my_question, sql=sql, df=df):
+                if should_generate_chart:
+                    # plot_code = generate_plotly_code_cached(question=my_question, sql=sql, df=df)
+                    try:
+                        plot_code = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_plotly_code_cached/', 
+                                        json={
+                                            'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        }).json()['response']
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error fetching data: {e}")
+                        return None
+                    
+                    if st.session_state.get("show_plotly_code", False):
+                        st.code(plot_code, language="python")
+                    # fig = generate_plot_cached(code=plot_code, df=df)
+
+                    try:
+                        fig = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_plot_cached/', 
+                                        json={
+                                            'code': orjson.dumps(plot_code, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        }).json()['response']
+                        fig = pio.from_json(orjson.loads(fig))
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error fetching data: {e}")
+                        return None
+                    
+                    if fig:
+                        st.plotly_chart(fig, key=f"chart_{str(uuid.uuid4())}")
+                        st.session_state.chat_history_1.append({"role": "assistant", "content": "### Query Chart", 'chart':fig})
+                    else:
+                        st.session_state.chat_history_1.append({"role": "assistant", "content": "I couldn't generate a chart"})
+
+                if st.session_state.get("show_summary", True):
+                    # summary = generate_summary_cached(question=my_question, df=df)
+                    try:
+                        summary = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_summary_cached/', 
+                                        json={
+                                            'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        }).json()['response']
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error fetching data: {e}")
+                        return None
+                    if summary is not None:
+                        assistant_message_summary = st.chat_message(
+                            "assistant", avatar=avatar_url
+                        )
+                        assistant_message_summary.text(summary)
+                        st.session_state.chat_history_1.append({"role": "assistant", "content": summary})
+                    else:
+                        st.session_state.chat_history_1.append({"role": "assistant", "content": "I couldn't summarize"})
+
+                # Generate follow-up questions
+                if st.session_state.get("show_followup", True):
+                    # followup_questions = generate_followup_cached(question=my_question, sql=sql, df=df)
+                    try:
+                        followup_questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_followup_cached/', 
+                                        json={
+                                            'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        }).json()['response']
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Error fetching data: {e}")
+                        return None
+                    if followup_questions:
+                        st.write("### Follow-Up Questions")
+                        for question in followup_questions[:5]:
+                            unique_key = str(uuid.uuid4())
+                            st.button(question, on_click=set_question, args=(question,), key=unique_key)
+                        st.button("Others", on_click=set_question, args=(None,), key=str(uuid.uuid4()))
+
+        else:
+            try:
+                # st.session_state.chat_history_1.append({"role": "user", "content": my_question})
+                qlist = []
+                for message in st.session_state.chat_history_1:
+                    qlist.append({'role': message['role'], 'content':message["content"]})
+                answer = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_answer_cached/', json={'question':  qlist}).json()['response']
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error fetching data: {e}")
+                return None
+            st.session_state.chat_history_1.append({"role": "assistant", "content": answer})
+
+            writeResults()
+
+            st.button("Others", on_click=set_question, args=(None,), key=str(uuid.uuid4()))
+
+        # st.session_state.is_processing = False
 
 if __name__ == "__main__":
     stramlit_ui()
-
-            
-
-            
-

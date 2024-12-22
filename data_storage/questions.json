@@ -1,0 +1,230 @@
+[
+    {
+        "question": "Find all rows where description is 'name' in the products table",
+        "answer": "SELECT * FROM products WHERE description = 'name';"
+    },
+    {
+        "question": "Get the address of orders made by customers",
+        "answer": "SELECT address FROM orders INNER JOIN customers ON orders.customer_id = customers.customer_id;"
+    },
+    {
+        "question": "Show the total name grouped by description in the products table",
+        "answer": "SELECT description, SUM(name) AS total_name FROM products GROUP BY description;"
+    },
+    {
+        "question": "Get the name of orders made by customers",
+        "answer": "SELECT name FROM orders INNER JOIN customers ON orders.customer_id = customers.customer_id;"
+    },
+    {
+        "question": "Retrieve all price sorted by stock_quantity in the products table",
+        "answer": "SELECT price FROM products ORDER BY stock_quantity;"
+    },
+    {
+        "question": "Retrieve all product_id sorted by price in the products table",
+        "answer": "SELECT product_id FROM products ORDER BY price;"
+    },
+    {
+        "question": "Find all rows where name is 'address' in the customers table",
+        "answer": "SELECT * FROM customers WHERE name = 'address';"
+    },
+    {
+        "question": "List all name from the products table",
+        "answer": "SELECT name FROM products;"
+    },
+    {
+        "question": "Find all rows where customer_id is 'email' in the customers table",
+        "answer": "SELECT * FROM customers WHERE customer_id = 'email';"
+    },
+    {
+        "question": "List all customer_id from the orders table",
+        "answer": "SELECT customer_id FROM orders;"
+    },
+    {
+        "question": "Retrieve all order_date sorted by order_date in the orders table",
+        "answer": "SELECT order_date FROM orders ORDER BY order_date;"
+    },
+    {
+        "question": "Find all rows where customer_id is 'name' in the customers table",
+        "answer": "SELECT * FROM customers WHERE customer_id = 'name';"
+    },
+    {
+        "question": "Get the email of orders made by customers",
+        "answer": "SELECT email FROM orders INNER JOIN customers ON orders.customer_id = customers.customer_id;"
+    },
+    {
+        "question": "List all customer_id from the customers table",
+        "answer": "SELECT customer_id FROM customers;"
+    },
+    {
+        "question": "Retrieve all product_id sorted by order_id in the orders table",
+        "answer": "SELECT product_id FROM orders ORDER BY order_id;"
+    },
+    {
+        "question": "Show the total order_date grouped by product_id in the orders table",
+        "answer": "SELECT product_id, SUM(order_date) AS total_order_date FROM orders GROUP BY product_id;"
+    },
+    {
+        "question": "Find all rows where price is 'name' in the products table",
+        "answer": "SELECT * FROM products WHERE price = 'name';"
+    },
+    {
+        "question": "Show the total description grouped by stock_quantity in the products table",
+        "answer": "SELECT stock_quantity, SUM(description) AS total_description FROM products GROUP BY stock_quantity;"
+    },
+    {
+        "question": "Find all rows where name is 'customer_id' in the customers table",
+        "answer": "SELECT * FROM customers WHERE name = 'customer_id';"
+    },
+    {
+        "question": "Find all rows where name is 'email' in the customers table",
+        "answer": "SELECT * FROM customers WHERE name = 'email';"
+    },
+    {
+        "question": "Retrieve all email sorted by name in the customers table",
+        "answer": "SELECT email FROM customers ORDER BY name;"
+    },
+    {
+        "question": "Find all rows where product_id is 'product_id' in the orders table",
+        "answer": "SELECT * FROM orders WHERE product_id = 'product_id';"
+    },
+    {
+        "question": "Show the total email grouped by name in the customers table",
+        "answer": "SELECT name, SUM(email) AS total_email FROM customers GROUP BY name;"
+    },
+    {
+        "question": "Show the total name grouped by address in the customers table",
+        "answer": "SELECT address, SUM(name) AS total_name FROM customers GROUP BY address;"
+    },
+    {
+        "question": "List all description from the products table",
+        "answer": "SELECT description FROM products;"
+    },
+    {
+        "question": "Retrieve all name sorted by name in the customers table",
+        "answer": "SELECT name FROM customers ORDER BY name;"
+    },
+    {
+        "question": "Retrieve all email sorted by customer_id in the customers table",
+        "answer": "SELECT email FROM customers ORDER BY customer_id;"
+    },
+    {
+        "question": "Show the total name grouped by email in the customers table",
+        "answer": "SELECT email, SUM(name) AS total_name FROM customers GROUP BY email;"
+    },
+    {
+        "question": "Find all rows where product_id is 'customer_id' in the orders table",
+        "answer": "SELECT * FROM orders WHERE product_id = 'customer_id';"
+    },
+    {
+        "question": "Retrieve all order_date sorted by order_id in the orders table",
+        "answer": "SELECT order_date FROM orders ORDER BY order_id;"
+    },
+    {
+        "question": "Retrieve all name sorted by price in the products table",
+        "answer": "SELECT name FROM products ORDER BY price;"
+    },
+    {
+        "question": "Show the total price grouped by description in the products table",
+        "answer": "SELECT description, SUM(price) AS total_price FROM products GROUP BY description;"
+    },
+    {
+        "question": "Find all rows where product_id is 'description' in the products table",
+        "answer": "SELECT * FROM products WHERE product_id = 'description';"
+    },
+    {
+        "question": "List all stock_quantity from the products table",
+        "answer": "SELECT stock_quantity FROM products;"
+    },
+    {
+        "question": "Retrieve all stock_quantity sorted by name in the products table",
+        "answer": "SELECT stock_quantity FROM products ORDER BY name;"
+    },
+    {
+        "question": "Find all rows where address is 'address' in the customers table",
+        "answer": "SELECT * FROM customers WHERE address = 'address';"
+    },
+    {
+        "question": "List all product_id from the orders table",
+        "answer": "SELECT product_id FROM orders;"
+    },
+    {
+        "question": "Retrieve all product_id sorted by order_date in the orders table",
+        "answer": "SELECT product_id FROM orders ORDER BY order_date;"
+    },
+    {
+        "question": "List all order_date from the orders table",
+        "answer": "SELECT order_date FROM orders;"
+    },
+    {
+        "question": "Find all rows where customer_id is 'customer_id' in the orders table",
+        "answer": "SELECT * FROM orders WHERE customer_id = 'customer_id';"
+    },
+    {
+        "question": "List all address from the customers table",
+        "answer": "SELECT address FROM customers;"
+    },
+    {
+        "question": "Show the total product_id grouped by order_date in the orders table",
+        "answer": "SELECT order_date, SUM(product_id) AS total_product_id FROM orders GROUP BY order_date;"
+    },
+    {
+        "question": "Show the total product_id grouped by customer_id in the orders table",
+        "answer": "SELECT customer_id, SUM(product_id) AS total_product_id FROM orders GROUP BY customer_id;"
+    },
+    {
+        "question": "Show the total product_id grouped by stock_quantity in the products table",
+        "answer": "SELECT stock_quantity, SUM(product_id) AS total_product_id FROM products GROUP BY stock_quantity;"
+    },
+    {
+        "question": "List all name from the customers table",
+        "answer": "SELECT name FROM customers;"
+    },
+    {
+        "question": "Show the total email grouped by customer_id in the customers table",
+        "answer": "SELECT customer_id, SUM(email) AS total_email FROM customers GROUP BY customer_id;"
+    },
+    {
+        "question": "Show the total stock_quantity grouped by name in the products table",
+        "answer": "SELECT name, SUM(stock_quantity) AS total_stock_quantity FROM products GROUP BY name;"
+    },
+    {
+        "question": "Retrieve all product_id sorted by name in the products table",
+        "answer": "SELECT product_id FROM products ORDER BY name;"
+    },
+    {
+        "question": "Retrieve all order_id sorted by product_id in the orders table",
+        "answer": "SELECT order_id FROM orders ORDER BY product_id;"
+    },
+    {
+        "question": "List all email from the customers table",
+        "answer": "SELECT email FROM customers;"
+    },
+    {
+        "question": "Show the total stock_quantity grouped by price in the products table",
+        "answer": "SELECT price, SUM(stock_quantity) AS total_stock_quantity FROM products GROUP BY price;"
+    },
+    {
+        "question": "Find all rows where product_id is 'order_date' in the orders table",
+        "answer": "SELECT * FROM orders WHERE product_id = 'order_date';"
+    },
+    {
+        "question": "Find all rows where email is 'email' in the customers table",
+        "answer": "SELECT * FROM customers WHERE email = 'email';"
+    },
+    {
+        "question": "List all order_id from the orders table",
+        "answer": "SELECT order_id FROM orders;"
+    },
+    {
+        "question": "Find all rows where order_date is 'customer_id' in the orders table",
+        "answer": "SELECT * FROM orders WHERE order_date = 'customer_id';"
+    },
+    {
+        "question": "Find all rows where stock_quantity is 'name' in the products table",
+        "answer": "SELECT * FROM products WHERE stock_quantity = 'name';"
+    },
+    {
+        "question": "Show the total customer_id grouped by customer_id in the orders table",
+        "answer": "SELECT customer_id, SUM(customer_id) AS total_customer_id FROM orders GROUP BY customer_id;"
+    }
+]

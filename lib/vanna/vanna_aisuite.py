@@ -85,14 +85,13 @@ class aisuite_Chat(Milvus_VectorStore):
         
         # Count the number of tokens in the message log
         # Use 4 as an approximation for the number of characters per token
-        num_tokens = 0
-        for message in prompt:
-            num_tokens += len(message["content"]) / 4
-
+        # num_tokens = 0
+        # for message in prompt:
+        #     num_tokens += len(message["content"]) / 4
         response = self.client.chat.completions.create(
             messages=prompt,
             # model='groq:llama-3.2-3b-preview',
-            model=self.config["model"]
+            model=self._model
         )
 
         return response.choices[0].message.content

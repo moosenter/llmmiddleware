@@ -5,3 +5,4 @@ uvicorn
 fastapi
 orjson
 pandas
+plotly

@@ -1,105 +1,211 @@
+import streamlit as st
+from lib.vanna.vanna_aisuite import aisuite_Chat
 from fastapi import FastAPI, Request
-from sentence_transformers import SentenceTransformer
-import faiss
-import os
-from dotenv import load_dotenv
-# from openai import OpenAI
-import aisuite as ai
 import uvicorn
-import time
+import orjson
+import re
 import pandas as pd
 import json
-import numpy as np
-from lib.database_processor_for_rag import database_demo
-from lib.vectordatabase import VectorDB
-load_dotenv()
 
-client = ai.Client()
 app = FastAPI()
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-t0 = time.time()
-db = VectorDB(database_path='data_storage/democompany-vector.db')
-db.getCollection()
-print(f'database reading time: {time.time() - t0} s')
+@app.get("/")
+async def read_root():
+    return {"message": "Hello, world!"}
 
-# def faiss_retrieve_context(query, top_k=2):
-#     # Search FAISS index
-#     query_embedding = embedding_model.encode(query)
-#     distances, indices = index.search(query_embedding, k=top_k)
-#     results = []
-#     for idx in indices[0]:
-#         if idx != -1:  # Ensure index is valid
-#             retrieved_text = knowledge_texts[idx]
-#             if "HR Record" in retrieved_text and "hr" in query.lower() or "who" in query.lower():
-#                 results.append({"type": "HR", "content": retrieved_text})
-#             elif "Sales Record" in retrieved_text and "sales" in query.lower():
-#                 results.append({"type": "Sales", "content": retrieved_text})
-#             else:
-#                 results.append({"type": "General", "content": retrieved_text})
+def clean_sql(sql):
+    sql = sql.strip('"').strip()
+    sql = sql.replace(r"\n", " ")
+    sql = re.sub(r";", "", sql)
+    return sql
 
-def retrieve_context(query, top_k=5):
-    # Generate embedding for the query
-    query_embedding = embedding_model.encode(query)
-    retrieved_texts = db.query_topk(query_embedding, topk=top_k)
-    return retrieved_texts
-
-@app.post("/model")
-async def generate_response(request: Request):
-    global model
+@st.cache_resource(ttl=3600)
+@app.post("/api/v2/setup_vanna")
+async def setup_vanna(request: Request):
     body = await request.json()
-    model = body.get("model")
+    config = body.get('configs')
+    global vn
+    # config={
+    #     'milvus_client':'data_storage/vanna-democompany-vector.db',
+    #     'model':'groq:llama-3.2-3b-preview', 
+    #     'sql_db':'data_storage/democompany.db',
+    #     'question_db': 'data_storage/questions.json'
+    # }
+    vn = aisuite_Chat(config=config)
+    vn.connect_to_sqlite(config['sql_db'])
+
+    existing_training_data = vn.get_training_data()
+    if len(existing_training_data) > 0:
+        for _, training_data in existing_training_data.iterrows():
+            vn.remove_training_data(training_data['id'])
+    df_ddl = vn.run_sql("SELECT type, sql FROM sqlite_master WHERE sql is not null")
+    for ddl in df_ddl['sql'].to_list():
+        vn.train(ddl=ddl)
+
+    with open(config['question_db'], "r") as json_file:
+        qsql_list = json.load(json_file)
+        for qsql in qsql_list:
+            vn.train(question=qsql['question'], sql=qsql['answer'])
+
+    existing_training_data = vn.get_training_data()
+    print(existing_training_data)
+    
     return {
-            'statusCode' : 200,
-            "response": model
-    } 
+                'statusCode' : 200,
+                "response": 'success'
+            }
 
-# Middleware endpoint
-@app.post("/generate")
-async def generate_response(request: Request):
+# @merged_decorator_with_args("Genera/ting sample questions ...", "/api/v2/generate_questions_cached")
+# @st.cache_data(show_spinner="Generating sample questions ...")
+@app.post("/api/v2/generate_questions_cached")
+async def generate_questions_cached(request: Request):
     body = await request.json()
-    if isinstance(body, list):
-        role = body[-1].get("role", "")
-        user_prompt = body[-1].get("content", "")
-    else:
-        role = 'user'
-        user_prompt = body.get("prompt", "")
-        
+    # config = body.get('configs')
+    # vn = setup_vanna(config)
+    response = vn.generate_questions()
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
 
-    # Retrieve context
-    context = retrieve_context(user_prompt)
-    print('-----------------------------')
-    print(f'Prompt: {user_prompt}')
-    print(f'Context : {context}')
-    print('-----------------------------')
 
-    if isinstance(body, list):
-        body.extend([{"role": "system", "content": f"Context: {context}"}])
-        messages=body
-    else:
-        messages=[
-                {"role": "system", "content": f"Context: {context}"},
-                {"role": role, "content": user_prompt}
-            ]
-    print(messages)
+# @st.cache_data(show_spinner="Generating SQL query ...")
+@app.post("/api/v2/generate_sql_cached")
+async def generate_sql_cached(request: Request):
+    body = await request.json()
+    question = body.get('question')
+    response = vn.generate_sql(question=question, allow_llm_to_see_data=True)
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
 
+# @st.cache_data(show_spinner="Checking for valid SQL ...")
+@app.post("/api/v2/is_sql_valid_cached")
+async def is_sql_valid_cached(request: Request):
+    body = await request.json()
+    sql = body.get('sql')
+    response = vn.is_sql_valid(sql=sql)
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
+
+# @st.cache_data(show_spinner="Running SQL query ...")
+@app.post("/api/v2/run_sql_cached")
+async def run_sql_cached(request: Request):
+    body = await request.body()
+    body = orjson.loads(body)
+    sql = body.get('sql')
+    sql = clean_sql(sql)
     try:
-        response = client.chat.completions.create(
-            messages=messages,
-            # model='groq:llama-3.2-3b-preview',
-            model=model
-        )
-        
+        response = vn.run_sql(sql=sql)
         return {
-            'statusCode' : 200,
-            "response": response.choices[0].message.content
-        }
+                    'statusCode' : 200,
+                    "response": orjson.dumps(response.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8")
+                }
     except Exception as e:
-
         return {
-            'statusCode' : 413,
-            "response": str(e)
-        }
+                    'statusCode' : 500,
+                    "response": f"Could not create table with the following sql \n```sql\n{sql}\n```"
+                }
+
+
+# @st.cache_data(show_spinner="Checking if we should generate a chart ...")
+@app.post("/api/v2/should_generate_chart_cached")
+async def should_generate_chart_cached(request: Request):
+    body = await request.body()
+    body = orjson.loads(body)
+    sql = body.get('sql')
+    sql = clean_sql(sql)
+    df = body.get('df')
+    df = json.loads(df)
+    df = pd.read_json(df)
+    question = body.get('question')
+    response = vn.should_generate_chart(df=df)
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
+
+# @st.cache_data(show_spinner="Generating Plotly code ...")
+@app.post("/api/v2/generate_plotly_code_cached")
+async def generate_plotly_code_cached(request: Request):
+    body = await request.body()
+    body = orjson.loads(body)
+    sql = body.get('sql')
+    sql = clean_sql(sql)
+    df = body.get('df')
+    df = json.loads(df)
+    df = pd.read_json(df)
+    question = body.get('question')
+    code = vn.generate_plotly_code(question=question, sql=sql, df=df)
+    response = code
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
+
+
+
+# @st.cache_data(show_spinner="Running Plotly code ...")
+@app.post("/api/v2/generate_plot_cached")
+async def generate_plot_cached(request: Request):
+    body = await request.body()
+    body = orjson.loads(body)
+    df = body.get('df')
+    df = json.loads(df)
+    df = pd.read_json(df)
+    code = body.get('code')
+    code = clean_sql(code)
+    response = vn.get_plotly_figure(plotly_code=code, df=df)
+    return {
+                'statusCode' : 200,
+                "response": orjson.dumps(response.to_json(), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8")
+            }
+
+# @st.cache_data(show_spinner="Generating followup questions ...")
+@app.post("/api/v2/generate_followup_cached")
+async def generate_followup_cached(request: Request):
+    body = await request.body()
+    body = orjson.loads(body)
+    sql = body.get('sql')
+    sql = clean_sql(sql)
+    df = body.get('df')
+    df = json.loads(df)
+    df = pd.read_json(df)
+    question = body.get('question')
+    response = vn.generate_followup_questions(question=question, sql=sql, df=df)
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
+
+# @st.cache_data(show_spinner="Generating summary ...")
+@app.post("/api/v2/generate_summary_cached")
+async def generate_summary_cached(request: Request):
+    body = await request.body()
+    body = orjson.loads(body)
+    df = body.get('df')
+    df = json.loads(df)
+    df = pd.read_json(df)
+    question = body.get('question')
+    response = vn.generate_summary(question=question, df=df)
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
+
+@app.post("/api/v2/generate_answer_cached")
+async def generate_answer_cached(request: Request):
+    body = await request.json()
+    question = body.get('question')
+    response = vn.submit_prompt(prompt=question)
+    return {
+                'statusCode' : 200,
+                "response": response
+            }
+
 
 if __name__ == "__main__":
-    uvicorn.run("middleware:app", host="0.0.0.0",port=8000, log_level="info")
+    uvicorn.run("middleware:app", host="0.0.0.0",port=8000, log_level="info", reload=True)

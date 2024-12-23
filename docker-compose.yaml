@@ -11,6 +11,8 @@ services:
       - backend  # Ensure backend starts first
     environment:
       - API_URL=http://backend:8000
+    networks:
+      - default
 
   
   backend:
@@ -25,17 +27,24 @@ services:
     environment:
       - MINIO_URL=http://minio:9000
       - MILVUS_URL=http://milvus:19530
+    networks:
+      - default
 
   nginx:
     image: nginx:latest
     container_name: middleware-nginx
     ports:
       - "80:80"
+      - "443:443"   # HTTPS
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro 
+      - ./nginx/logs:/var/log/nginx
     depends_on:
       - frontend
       - backend
+    networks:
+      - default
   
   etcd:
     container_name: middleware-milvus-etcd
@@ -47,6 +56,8 @@ services:
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
     command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - default
 
   minio:
     container_name: middleware-milvus-minio
@@ -64,6 +75,8 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
+    networks:
+      - default
 
 
   standalone:
@@ -81,6 +94,8 @@ services:
     depends_on:
       - "etcd"
       - "minio"
+    networks:
+      - default
 
 
 networks:

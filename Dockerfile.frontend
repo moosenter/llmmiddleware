@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY .streamlit/ .streamlit/
 COPY config/ config/
+COPY data_storage/user_database.db data_storage/user_database.db
 COPY frontend/ frontend/
 COPY requirements-frontend.txt .
 

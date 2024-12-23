@@ -6,3 +6,4 @@ fastapi
 orjson
 pandas
 plotly
+pyjwt

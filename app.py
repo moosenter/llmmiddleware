@@ -7,8 +7,10 @@ import yaml
 import orjson
 import pandas as pd
 import plotly.io as pio
+from frontend.login import login_page, register_page
 
 avatar_url = "frontend/assets/middleware_icon.png"
+st.set_page_config(page_title="LLM Middleware", layout="wide")
 
 def set_question(question):
     st.session_state["my_question"] = question
@@ -57,8 +59,6 @@ def stramlit_ui():
         st.session_state.use_comparison_mode = False
     if "run_once_flag" not in st.session_state:
         st.session_state["run_once_flag"] = False
-
-    st.set_page_config(layout="wide")
 
     st.markdown(
             """
@@ -135,6 +135,9 @@ def stramlit_ui():
     st.sidebar.checkbox("Show Summary", value=True, key="show_summary")
     st.sidebar.checkbox("Show Follow-up Questions", value=True, key="show_followup")
     st.sidebar.button("Reset", on_click=lambda: reset_button(), use_container_width=True)
+    if st.sidebar.button("Logout", use_container_width=True):
+        st.session_state["token"] = None
+        st.rerun()
 
     st.title("LLM Middleware")
     st.sidebar.write(st.session_state)
@@ -342,4 +345,16 @@ def stramlit_ui():
         # st.session_state.is_processing = False
 
 if __name__ == "__main__":
-    stramlit_ui()
+    # stramlit_ui()
+    # Router
+    if "token" not in st.session_state:
+        st.session_state["token"] = None
+
+    if st.session_state["token"]:
+        stramlit_ui()
+    else:
+        tab = st.sidebar.radio("Navigation", ["Login", "Register"])
+        if tab == "Login":
+            login_page()
+        else:
+            register_page()

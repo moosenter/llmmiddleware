@@ -2,15 +2,25 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY .streamlit/ .streamlit/
-COPY config/ config/
-COPY data_storage/user_database.db data_storage/user_database.db
-COPY frontend/ frontend/
+# Create required directories
+RUN mkdir -p .streamlit
+RUN mkdir -p data_storage
+RUN mkdir -p config
+RUN mkdir -p llmmiddleware
+
+# Add necessary files
+COPY app.py .
+COPY llmmiddleware/ llmmiddleware/
 COPY requirements-frontend.txt .
 
-RUN pip install -r requirements-frontend.txt
+# Try to copy optional files using shell commands
+RUN if [ -d ".streamlit" ]; then cp -r .streamlit/* .streamlit/ || true; fi
+RUN if [ -d "config" ]; then cp -r config/* config/ || true; fi
+RUN if [ -f "data_storage/user_database.db" ]; then cp data_storage/user_database.db data_storage/ || true; fi
 
-COPY app.py .
+# Install frontend dependencies and aisuite
+RUN pip install -r requirements-frontend.txt
+RUN pip install aisuite>=0.1.11
 
 EXPOSE 8501
 

@@ -1,111 +1,114 @@
-version: "3.8"
-services:
-  frontend:
-    container_name: middleware-frontend
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    ports:
-      - "8501:8501"  # Map frontend port to host
-    depends_on:
-      - backend  # Ensure backend starts first
-    environment:
-      - API_URL=http://backend:8000
-    networks:
-      - default
+version: '3'
 
-  
+services:
   backend:
-    container_name: middleware-backend
     build:
       context: .
       dockerfile: Dockerfile.backend
     ports:
-      - "8000:8000"  # Map backend port to host
-    depends_on:
-      - standalone
+      - "8000:8000"
     environment:
-      - MINIO_URL=http://minio:9000
-      - MILVUS_URL=http://milvus:19530
-    networks:
-      - default
-
-  nginx:
-    image: nginx:latest
-    container_name: middleware-nginx
-    ports:
-      - "80:80"
-      - "443:443"   # HTTPS
+      - PYTHONUNBUFFERED=1
+      - DB_URL=db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password
+      - DB_PORT=5432
+      - DB_NAME=mydatabase
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro 
-      - ./nginx/logs:/var/log/nginx
-    depends_on:
-      - frontend
-      - backend
+      - ./:/app
+      - ./data_storage:/app/data_storage
+      - ./llmmiddleware:/app/llmmiddleware
+      - ./config:/app/config
     networks:
-      - default
-  
+      - app-network
+    depends_on:
+      - db
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - API_URL=http://backend:8000
+    volumes:
+      - ./:/app
+      - ./data_storage:/app/data_storage
+      - ./llmmiddleware:/app/llmmiddleware
+      - ./config:/app/config
+    networks:
+      - app-network
+    depends_on:
+      - backend
+    restart: always
+
+  db:
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=mydatabase
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: always
+
+  vector_db:
+    image: milvusdb/milvus:v2.3.3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    volumes:
+      - milvus_data:/var/lib/milvus
+    networks:
+      - app-network
+    depends_on:
+      - etcd
+      - minio
+    command: ["milvus", "run", "standalone"]
+    restart: always
+
   etcd:
-    container_name: middleware-milvus-etcd
     image: quay.io/coreos/etcd:v3.5.0
     environment:
       - ETCD_AUTO_COMPACTION_MODE=revision
       - ETCD_AUTO_COMPACTION_RETENTION=1000
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+      - etcd_data:/etcd
     networks:
-      - default
+      - app-network
+    command: ["etcd", "--advertise-client-urls=http://etcd:2379", "--listen-client-urls=http://0.0.0.0:2379", "--data-dir=/etcd"]
+    restart: always
 
   minio:
-    container_name: middleware-milvus-minio
-    image: minio/minio:RELEASE.2020-12-03T00-03-10Z
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
-    command: minio server /minio_data
-    ports:
-      - "9000:9000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      - minio_data:/data
     networks:
-      - default
-
-
-  standalone:
-    container_name: middleware-milvus-standalone
-    # image: milvusdb/milvus:v2.0.2
-    image: milvusdb/milvus:latest
-    command: ["milvus", "run", "standalone"]
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-    volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
-    ports:
-      - "19530:19530"
-    depends_on:
-      - "etcd"
-      - "minio"
-    networks:
-      - default
-
+      - app-network
+    command: ["minio", "server", "/data", "--console-address", ":9001"]
+    restart: always
 
 networks:
-  default:
-    name: milvus-networks
+  app-network:
+    driver: bridge
 
 volumes:
+  postgres_data:
+  milvus_data:
+  etcd_data:
   minio_data:
-    external: false
-  etcd:
-    external: false
-  milvus:
-    external: false

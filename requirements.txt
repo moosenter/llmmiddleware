@@ -1,12 +1,12 @@
-fastapi
+fastapi>=0.103.1
 sentence_transformers
 faiss-cpu
 python-dotenv
-uvicorn
+uvicorn>=0.23.2
 pandas
 numpy
-streamlit
-aisuite
+streamlit==1.25.0
+aisuite>=0.1.11
 openai
 groq
 anthropic
@@ -19,3 +19,12 @@ vanna
 pymilvus[model]
 pydantic
 orjson
+plotly
+matplotlib
+pyyaml
+requests
+python-jose>=3.3.0
+passlib>=1.7.4
+python-multipart>=0.0.6
+bcrypt>=4.0.1
+-e . 

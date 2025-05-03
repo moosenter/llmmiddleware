@@ -7,9 +7,15 @@ import yaml
 import orjson
 import pandas as pd
 import plotly.io as pio
-from frontend.login import login_page, register_page
+from llmmiddleware.frontend.login import login_page, register_page
 
-avatar_url = "frontend/assets/middleware_icon.png"
+# Use environment-aware paths
+if os.path.exists("config/ModelConfig.yaml"):
+    config_path = "config"
+else:
+    config_path = "llmmiddleware/config"
+
+avatar_url = "llmmiddleware/frontend/assets/middleware_icon.png"
 st.set_page_config(page_title="LLM Middleware", layout="wide")
 
 def set_question(question):
@@ -18,10 +24,7 @@ def set_question(question):
 def reset_button():
     st.session_state["my_question"] = None
     st.session_state.chat_history_1 = []
-    # st.session_state.chat_history_2 = []
-    # st.session_state.is_processing = False
     st.session_state.run_once_flag = False
-    # st.experimental_rerun()
 
 def writeResults():
     for message in st.session_state.chat_history_1:
@@ -44,17 +47,13 @@ def writeResults():
                 st.markdown(message["content"])
 
 def stramlit_ui():
-    with open("config/ModelConfig.yaml", "r") as file:
+    with open(f"{config_path}/ModelConfig.yaml", "r") as file:
         config = yaml.safe_load(file)
     configured_llms = config["llms"]
 
     # Initialize session states
     if "chat_history_1" not in st.session_state:
         st.session_state.chat_history_1 = []
-    # if "chat_history_2" not in st.session_state:
-    #     st.session_state.chat_history_2 = []
-    # if "is_processing" not in st.session_state:
-    #     st.session_state.is_processing = False
     if "use_comparison_mode" not in st.session_state:
         st.session_state.use_comparison_mode = False
     if "run_once_flag" not in st.session_state:
@@ -151,7 +150,7 @@ def stramlit_ui():
     model_config_1 = next(
         llm for llm in configured_llms if llm["name"] == selected_model_1
     )
-    with open("config/AppConfig.yaml", "r") as file:
+    with open(f"{config_path}/AppConfig.yaml", "r") as file:
         configs = yaml.safe_load(file)
     configs = configs["vannaconf"]
     configs.update({'model':model_config_1["provider"] + ":" + model_config_1["model"]})
@@ -159,17 +158,22 @@ def stramlit_ui():
     if st.session_state["run_once_flag"] is False:
         st.session_state["run_once_flag"] = True
         try:
-            questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/setup_vanna/', json={'configs': configs}).json()['response']
+            questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/setup_vanna/', json={'configs': configs}, timeout=10).json()['response']
         except requests.exceptions.RequestException as e:
-            st.error(f"Error fetching data: {e}")
-            return None
+            st.error(f"Error connecting to backend service: {str(e)}")
+            questions = []
+        except KeyError:
+            st.error("Unexpected response format from backend")
+            questions = []
+        except Exception as e:
+            st.error(f"Unexpected error: {str(e)}")
+            questions = []
 
     assistant_message_suggested = st.chat_message(
         "assistant", avatar=avatar_url
     )
     if assistant_message_suggested.button("Click to show suggested questions"):
         st.session_state["my_question"] = None
-        # questions = generate_questions_cached(configs)
         try:
             questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_questions_cached/', json={'configs': configs}).json()['response']
         except requests.exceptions.RequestException as e:
@@ -185,28 +189,112 @@ def stramlit_ui():
             )
 
     my_question = st.session_state.get("my_question", default=None)
-    # if st.session_state.is_processing == False:
     if my_question is None:
         my_question = st.chat_input(
             "Ask me a question about your data",
         )
 
     if my_question:
-        # st.session_state.is_processing = True
-        st.session_state["my_question"] = my_question
-        st.session_state.chat_history_1.append({"role": "user", "content": my_question})
+        current_question = my_question  # Store the current question for processing
+        st.session_state.chat_history_1.append({"role": "user", "content": current_question})
+        
+        # Clear the question from session state so next input will be fresh
+        st.session_state["my_question"] = None
+        
+        # Process the current question
+        # Add a loading spinner while waiting for SQL generation
+        with st.spinner("Generating SQL..."):
+            try:
+                sql_response = requests.post(
+                    os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_sql_cached/', 
+                    json={'question': current_question},
+                    timeout=15
+                ).json()
+                
+                if 'error' in sql_response:
+                    st.error(f"Error generating SQL: {sql_response['error']}")
+                    st.session_state.chat_history_1.append({
+                        "role": "assistant", 
+                        "content": f"I'm sorry, {sql_response['error']}"
+                    })
+                    writeResults()
+                    return None
+                    
+                sql = sql_response['response']
+                if not sql:
+                    st.error("Generated SQL is empty")
+                    st.session_state.chat_history_1.append({
+                        "role": "assistant", 
+                        "content": "I'm sorry, I couldn't understand your question. Please try asking a more specific data-related question, such as:\n\n- How many customers do we have?\n- What's our total revenue?\n- Which products have the highest sales?\n- What was our revenue last month?"
+                    })
+                    writeResults()
+                    return None
+            except requests.exceptions.Timeout:
+                st.error("Request timed out. The server took too long to respond.")
+                st.session_state.chat_history_1.append({
+                    "role": "assistant", 
+                    "content": "I'm sorry, the request timed out. Please try again later."
+                })
+                writeResults()
+                return None
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error connecting to backend service: {str(e)}")
+                st.session_state.chat_history_1.append({
+                    "role": "assistant", 
+                    "content": "I'm sorry, there was an error connecting to the backend service."
+                })
+                writeResults()
+                return None
+            except KeyError:
+                st.error("Unexpected response format from backend")
+                st.session_state.chat_history_1.append({
+                    "role": "assistant", 
+                    "content": "I'm sorry, I received an unexpected response format from the backend."
+                })
+                writeResults()
+                return None
+            except Exception as e:
+                st.error(f"Unexpected error: {str(e)}")
+                st.session_state.chat_history_1.append({
+                    "role": "assistant", 
+                    "content": f"I'm sorry, an unexpected error occurred: {str(e)}"
+                })
+                writeResults()
+                return None
 
-        # sql = generate_sql_cached(question=my_question)
         try:
-            sql = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_sql_cached/', json={'question': my_question}).json()['response']
-        except requests.exceptions.RequestException as e:
-            st.error(f"Error fetching data: {e}")
+            is_sql_valid = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/is_sql_valid_cached/', json={'sql': sql}, timeout=10).json()['response']
+        except requests.exceptions.Timeout:
+            st.error("Request timed out during SQL validation")
+            st.session_state.chat_history_1.append({
+                "role": "assistant", 
+                "content": "I'm sorry, the request timed out during SQL validation. Please try again later."
+            })
+            writeResults()
             return None
-
-        try:
-            is_sql_valid = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/is_sql_valid_cached/', json={'sql': sql}).json()['response']
         except requests.exceptions.RequestException as e:
-            st.error(f"Error fetching data: {e}")
+            st.error(f"Error connecting to backend service: {str(e)}")
+            st.session_state.chat_history_1.append({
+                "role": "assistant", 
+                "content": "I'm sorry, there was an error connecting to the backend service during SQL validation."
+            })
+            writeResults()
+            return None
+        except KeyError:
+            st.error("Unexpected response format from backend during SQL validation")
+            st.session_state.chat_history_1.append({
+                "role": "assistant", 
+                "content": "I'm sorry, I received an unexpected response format during SQL validation."
+            })
+            writeResults()
+            return None
+        except Exception as e:
+            st.error(f"Unexpected error during SQL validation: {str(e)}")
+            st.session_state.chat_history_1.append({
+                "role": "assistant", 
+                "content": f"I'm sorry, an unexpected error occurred during SQL validation: {str(e)}"
+            })
+            writeResults()
             return None
         
         if sql and is_sql_valid:
@@ -214,18 +302,76 @@ def stramlit_ui():
 
             st.session_state.chat_history_1.append({"role": "assistant", "content": f"SQL generated:\n```sql\n{sql}\n```"})
 
-            # df = run_sql_cached(sql=sql)
-            try:
-                df = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/run_sql_cached/', 
-                                   json={'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8")}).json()['response']
+            # Add a loading spinner while executing SQL
+            with st.spinner("Running SQL query..."):
                 try:
-                    df = orjson.loads(df)
-                except orjson.JSONDecodeError as e:
-                    print(f"JSON decoding failed: {e}")
-                df = pd.read_json(df)
-            except requests.exceptions.RequestException as e:
-                st.error(f"Error fetching data: {e}")
-                return None
+                    df_response = requests.post(
+                        os.getenv('API_URL', 'http://backend:8000')+'/api/v2/run_sql_cached/', 
+                        json={'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8")},
+                        timeout=20
+                    ).json()
+                    
+                    if 'error' in df_response:
+                        st.error(f"Error executing SQL: {df_response['error']}")
+                        st.session_state.chat_history_1.append({
+                            "role": "assistant", 
+                            "content": f"I'm sorry, there was an error executing the SQL query: {df_response['error']}"
+                        })
+                        writeResults()
+                        return None
+                        
+                    df = df_response['response']
+                    try:
+                        df = orjson.loads(df)
+                    except orjson.JSONDecodeError as e:
+                        st.error(f"Error decoding JSON response: {str(e)}")
+                        st.session_state.chat_history_1.append({
+                            "role": "assistant", 
+                            "content": "I'm sorry, I couldn't decode the query results."
+                        })
+                        writeResults()
+                        return None
+                        
+                    try:
+                        df = pd.read_json(df)
+                        if df.empty:
+                            st.warning("The query returned no results")
+                            st.session_state.chat_history_1.append({
+                                "role": "assistant", 
+                                "content": "The query executed successfully but returned no results."
+                            })
+                    except Exception as e:
+                        st.error(f"Error converting results to DataFrame: {str(e)}")
+                        st.session_state.chat_history_1.append({
+                            "role": "assistant", 
+                            "content": f"I'm sorry, I couldn't process the query results: {str(e)}"
+                        })
+                        writeResults()
+                        return None
+                except requests.exceptions.Timeout:
+                    st.error("Request timed out during SQL execution")
+                    st.session_state.chat_history_1.append({
+                        "role": "assistant", 
+                        "content": "I'm sorry, the request timed out during SQL execution. Please try again later or simplify your query."
+                    })
+                    writeResults()
+                    return None
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Error connecting to backend service: {str(e)}")
+                    st.session_state.chat_history_1.append({
+                        "role": "assistant", 
+                        "content": "I'm sorry, there was an error connecting to the backend service during SQL execution."
+                    })
+                    writeResults()
+                    return None
+                except Exception as e:
+                    st.error(f"Unexpected error during SQL execution: {str(e)}")
+                    st.session_state.chat_history_1.append({
+                        "role": "assistant", 
+                        "content": f"I'm sorry, an unexpected error occurred during SQL execution: {str(e)}"
+                    })
+                    writeResults()
+                    return None
 
             if df is not None:
                 st.session_state["df"] = df
@@ -245,21 +391,19 @@ def stramlit_ui():
                                     json={
                                         'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                         'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
-                                        'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                        'question': orjson.dumps(current_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                     }).json()['response']
                 except requests.exceptions.RequestException as e:
                     st.error(f"Error fetching data: {e}")
                     return None
         
-                # if should_generate_chart_cached(question=my_question, sql=sql, df=df):
                 if should_generate_chart:
-                    # plot_code = generate_plotly_code_cached(question=my_question, sql=sql, df=df)
                     try:
                         plot_code = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_plotly_code_cached/', 
                                         json={
                                             'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                             'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
-                                            'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'question': orjson.dumps(current_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                         }).json()['response']
                     except requests.exceptions.RequestException as e:
                         st.error(f"Error fetching data: {e}")
@@ -267,7 +411,6 @@ def stramlit_ui():
                     
                     if st.session_state.get("show_plotly_code", False):
                         st.code(plot_code, language="python")
-                    # fig = generate_plot_cached(code=plot_code, df=df)
 
                     try:
                         fig = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_plot_cached/', 
@@ -287,11 +430,10 @@ def stramlit_ui():
                         st.session_state.chat_history_1.append({"role": "assistant", "content": "I couldn't generate a chart"})
 
                 if st.session_state.get("show_summary", True):
-                    # summary = generate_summary_cached(question=my_question, df=df)
                     try:
                         summary = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_summary_cached/', 
                                         json={
-                                            'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'question': orjson.dumps(current_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                             'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                         }).json()['response']
                     except requests.exceptions.RequestException as e:
@@ -308,11 +450,10 @@ def stramlit_ui():
 
                 # Generate follow-up questions
                 if st.session_state.get("show_followup", True):
-                    # followup_questions = generate_followup_cached(question=my_question, sql=sql, df=df)
                     try:
                         followup_questions = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_followup_cached/', 
                                         json={
-                                            'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                                            'question': orjson.dumps(current_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                             'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                             'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
                                         }).json()['response']
@@ -327,25 +468,36 @@ def stramlit_ui():
                         st.button("Others", on_click=set_question, args=(None,), key=str(uuid.uuid4()))
 
         else:
+            # This path is taken when SQL generation or validation fails
+            # Use predefined examples to help the user
+            sample_questions = [
+                "How many customers do we have?",
+                "What's our total revenue?",
+                "Which products have the highest sales?",
+                "What was our revenue last month?",
+                "Who are our top 5 customers?"
+            ]
+            
             try:
-                # st.session_state.chat_history_1.append({"role": "user", "content": my_question})
                 qlist = []
                 for message in st.session_state.chat_history_1:
                     qlist.append({'role': message['role'], 'content':message["content"]})
                 answer = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_answer_cached/', json={'question':  qlist}).json()['response']
             except requests.exceptions.RequestException as e:
                 st.error(f"Error fetching data: {e}")
-                return None
+                # Provide a fallback message if the request fails
+                answer = "I'm having trouble understanding that question. Please try one of the sample questions below."
+            
             st.session_state.chat_history_1.append({"role": "assistant", "content": answer})
-
             writeResults()
-
-            st.button("Others", on_click=set_question, args=(None,), key=str(uuid.uuid4()))
-
-        # st.session_state.is_processing = False
+            
+            # Display predefined questions that are guaranteed to work
+            st.write("### Try these sample questions:")
+            for question in sample_questions:
+                unique_key = str(uuid.uuid4())
+                st.button(question, on_click=set_question, args=(question,), key=unique_key)
 
 if __name__ == "__main__":
-    # stramlit_ui()
     # Router
     if "token" not in st.session_state:
         st.session_state["token"] = None

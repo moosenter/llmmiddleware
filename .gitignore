@@ -15,3 +15,5 @@ milvus.db
 nginx/certs/*.crt
 nginx/certs/*.key
 nginx/logs/
+data_storage/user_database
+*.mdf

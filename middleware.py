@@ -6,6 +6,7 @@ import orjson
 import re
 import pandas as pd
 import json
+import io
 
 app = FastAPI()
 
@@ -14,12 +15,29 @@ async def read_root():
     return {"message": "Hello, world!"}
 
 def clean_sql(sql):
-    sql = sql.strip('"').strip()
+    # sql = sql.strip('"').strip()
+    if sql.startswith('"') and sql.endswith('"'):
+        sql = sql[1:-1]
     sql = sql.replace(r"\n", " ")
+    sql = sql.replace(r"\t", "")
     sql = re.sub(r";", "", sql)
+    """
+    Cleans SQL for use in JSON APIs and makes it safe for sqlite3 cursor.execute().
+    - Strips leading/trailing spaces.
+    - Removes unnecessary newlines and indentation.
+    - Does NOT escape quotes (sqlite3 expects raw SQL, not a JSON string literal).
+    """
+    # Collapse lines into one space-separated string
+    # cleaned = " ".join(line.strip() for line in sql.strip().splitlines() if line.strip())
+    # return cleaned
+    # if sql.startswith('"') and sql.endswith('"'):
+    #     sql = sql[1:-1]  # Remove wrapping quotes
+    # return " ".join(line.strip() for line in sql.splitlines() if line.strip())
+    # return sql.replace('\\"', '"').replace('\\\'', "'")
+    sql = sql.replace('\\"', '"').replace('\\\'', "'")
     return sql
 
-@st.cache_resource(ttl=3600)
+# @st.cache_resource(ttl=3600)
 @app.post("/api/v2/setup_vanna")
 async def setup_vanna(request: Request):
     body = await request.json()
@@ -42,10 +60,10 @@ async def setup_vanna(request: Request):
     for ddl in df_ddl['sql'].to_list():
         vn.train(ddl=ddl)
 
-    with open(config['question_db'], "r") as json_file:
-        qsql_list = json.load(json_file)
-        for qsql in qsql_list:
-            vn.train(question=qsql['question'], sql=qsql['answer'])
+    # with open(config['question_db'], "r") as json_file:
+    #     qsql_list = json.load(json_file)
+    #     for qsql in qsql_list:
+    #         vn.train(question=qsql['question'], sql=qsql['answer'])
 
     existing_training_data = vn.get_training_data()
     print(existing_training_data)
@@ -73,8 +91,11 @@ async def generate_questions_cached(request: Request):
 @app.post("/api/v2/generate_sql_cached")
 async def generate_sql_cached(request: Request):
     body = await request.json()
-    question = body.get('question')
+    question = body.get('question') 
     response = vn.generate_sql(question=question, allow_llm_to_see_data=True)
+    global generate_sql_ans
+    generate_sql_ans = response
+    print("generate_sql: ", response)
     return {
                 'statusCode' : 200,
                 "response": response
@@ -86,6 +107,7 @@ async def is_sql_valid_cached(request: Request):
     body = await request.json()
     sql = body.get('sql')
     response = vn.is_sql_valid(sql=sql)
+    print("is_sql_valid: ", response)
     return {
                 'statusCode' : 200,
                 "response": response
@@ -98,6 +120,10 @@ async def run_sql_cached(request: Request):
     body = orjson.loads(body)
     sql = body.get('sql')
     sql = clean_sql(sql)
+    print(sql)
+    # response = vn.run_sql(sql=sql)
+    response = vn.run_sql(sql=generate_sql_ans)
+    print("run_sql: ", response)
     try:
         response = vn.run_sql(sql=sql)
         return {
@@ -120,7 +146,8 @@ async def should_generate_chart_cached(request: Request):
     sql = clean_sql(sql)
     df = body.get('df')
     df = json.loads(df)
-    df = pd.read_json(df)
+    # df = pd.read_json(io.StringIO(df), dtype=None, precise_float=True, lines=True)
+    df = pd.read_json(io.StringIO(df), dtype=None, precise_float=True)
     question = body.get('question')
     response = vn.should_generate_chart(df=df)
     return {
@@ -139,8 +166,12 @@ async def generate_plotly_code_cached(request: Request):
     df = json.loads(df)
     df = pd.read_json(df)
     question = body.get('question')
-    code = vn.generate_plotly_code(question=question, sql=sql, df=df)
+    # code = vn.generate_plotly_code(question=question, sql=sql, df=df)
+    code = vn.generate_plotly_code(question=question, sql=generate_sql_ans, df=df)
     response = code
+
+    global generate_code_ans
+    generate_code_ans = code
     return {
                 'statusCode' : 200,
                 "response": response
@@ -158,7 +189,9 @@ async def generate_plot_cached(request: Request):
     df = pd.read_json(df)
     code = body.get('code')
     code = clean_sql(code)
-    response = vn.get_plotly_figure(plotly_code=code, df=df)
+    print('code: ', code)
+    # response = vn.get_plotly_figure(plotly_code=code, df=df)
+    response = vn.get_plotly_figure(plotly_code=generate_code_ans, df=df)
     return {
                 'statusCode' : 200,
                 "response": orjson.dumps(response.to_json(), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8")
@@ -201,6 +234,7 @@ async def generate_answer_cached(request: Request):
     body = await request.json()
     question = body.get('question')
     response = vn.submit_prompt(prompt=question)
+    print('submit_prompt: ', response)
     return {
                 'statusCode' : 200,
                 "response": response

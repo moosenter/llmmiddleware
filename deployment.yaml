@@ -132,8 +132,6 @@ spec:
               cpu: "500m"
       volumes:
         - name: nginx-config
-          configMap:
-            name: nginx-config
 ---
 apiVersion: v1
 kind: Service
@@ -147,7 +145,7 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
-  type: NodePort
+  type: LoadBalancer
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -13,6 +13,8 @@ services:
       - API_URL=http://backend:8000
     networks:
       - default
+    volumes:
+      - /Users/visarutt/Documents/boss/middleware/data_storage:/app/data_storage
 
   
   backend:

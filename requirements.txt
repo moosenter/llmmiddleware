@@ -19,3 +19,5 @@ vanna
 pymilvus[model]
 pydantic
 orjson
+docstring_parser
+vertexai

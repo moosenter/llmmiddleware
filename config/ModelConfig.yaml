@@ -1,13 +1,28 @@
 llms:
-  - name: "LLAMA3.2"
+  - name: "llama-4-maverick-17b"
     provider: "groq"
-    model: 'llama-3.2-3b-preview'
+    model: 'meta-llama/llama-4-maverick-17b-128e-instruct'
+  - name: "qwen-qwq-32b"
+    provider: "groq"
+    model: 'qwen-qwq-32b'
+  - name: "llama-3.3-70b-versatile"
+    provider: "groq"
+    model: 'llama-3.3-70b-versatile'
+  - name: "llama3-8b-8192"
+    provider: "groq"
+    model: 'llama3-8b-8192'
+  - name: "deepseek-r1-distill-llama-70b"
+    provider: "groq"
+    model: 'deepseek-r1-distill-llama-70b'
   - name: "OpenAI gpt-3.5-turbo"
     provider: "openai"
     model: "gpt-3.5-turbo"
   - name: "OpenAI GPT-4o"
     provider: "openai"
     model: "gpt-4o"
+  - name: "gemini-2.5-flash"
+    provider: "google"
+    model: 'gemini-2.5-flash'
   - name: "Anthropic Claude 3.5 Sonnet"
     provider: "anthropic"
     model: "claude-3-5-sonnet-20240620"
@@ -16,4 +31,4 @@ llms:
     model: "gpt-4o"
   - name: "Huggingface/Mistral 7B"
     provider: "huggingface"
-    model: "mistralai/Mistral-7B-Instruct"
+    model: "mistralai/Mistral-7B-Instruct-v0.3"

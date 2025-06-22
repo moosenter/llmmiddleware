@@ -1,0 +1,40 @@
+predefinedqustions:
+ # Sales & Product Performance:
+ - question: Sales & Product Performance - Which products or categories generate the highest revenue and margin?
+ - question: Sales & Product Performance - Which brands perform best in specific regions or stores?
+ - question: Sales & Product Performance - What is the seasonal trend of product sales by category?
+
+# Transaction Behavior
+ - question: Transaction Behavior - What is the average basket size per transaction per store or province?
+ - question: Transaction Behavior - Do members with loyalty cards spend more per visit than non-members?
+ - question: Transaction Behavior - Which stores have the highest rate of returned or refunded transactions?
+
+# Customer & Membership Insights
+ - question: Customer & Membership Insights - What proportion of total sales comes from loyalty card members?
+ - question: Customer & Membership Insights - Which membership segments are most profitable?
+ - question: Customer & Membership Insights - What retention strategies work for high-value members?
+
+# Payment Optimization
+# 1.Which payment types are most frequently used per store or province?
+# 2.Is there a correlation between payment type and customer loyalty or return rate?
+# 3.Are promotions or discounts tied to specific payment methods effective in boosting sales?
+
+# Inventory & Stock Strategy
+# 1.Which products have low stock turnover, indicating possible overstock?
+# 2.Which high-performing products face frequent stockouts and need improved replenishment?
+# 3.Are there regional differences in stock balance that suggest redistribution opportunities?
+
+# Store & Regional Performance
+# 1.Which provinces or branches show the highest growth over time?
+# 2.Are underperforming stores suffering due to location, product mix, or service issues?
+# 3.Which stores have the highest loyalty conversion rate?
+
+# Supplier & Cost Management
+# 1.Which suppliers consistently deliver high-margin products?
+# 2.Are there suppliers with frequent issues (e.g., late delivery, high return rate)?
+# 3.Can bundling or negotiating with top suppliers reduce procurement costs?
+
+# Profitability & Financial Planning
+# 1.What is the profit margin by category, store, or brand?
+# 2.What pricing strategies increase revenue without hurting volume?
+# 3.Where can we reduce cost (logistics, suppliers, slow-moving inventory) without harming sales?

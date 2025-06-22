@@ -1,4 +1,4 @@
 vannaconf:
-  milvus_client: 'data_storage/vanna-democompany-vector.db'
-  sql_db: 'data_storage/democompany.db'
-  question_db: 'data_storage/questions.json'
+  milvus_client: data_storage/vanna-democompany-vector.db
+  question_db: data_storage/questions.json
+  sql_db: data_storage/demosales.db

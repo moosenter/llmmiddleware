@@ -7,7 +7,7 @@ import yaml
 import orjson
 import pandas as pd
 import plotly.io as pio
-from frontend.login import login_page, register_page
+from frontend.login import login_page, register_page, admin_page, admin_login_page
 import glob 
 import io
 import ujson
@@ -438,8 +438,12 @@ if __name__ == "__main__":
     if st.session_state["token"]:
         stramlit_ui()
     else:
-        tab = st.sidebar.radio("Navigation", ["Login", "Register"])
+        tab = st.sidebar.radio("Navigation", ["Login", "Register","Admin Login", "Admin Page"])
         if tab == "Login":
             login_page()
+        elif tab == "Admin Login":
+            admin_login_page()
+        elif tab == "Admin Page":
+            admin_page()
         else:
             register_page()

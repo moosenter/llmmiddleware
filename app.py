@@ -256,7 +256,7 @@ def stramlit_ui():
                 sql = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_sql_cached/', json={'question': my_question}).json()['response']
             except requests.exceptions.RequestException as e:
                 st.error(f"Error fetching data: {e}")
-                print("sql was:", repr(sql))
+                # print("sql was:", repr(sql))
                 return None
 
             try:
@@ -299,8 +299,8 @@ def stramlit_ui():
                     if len(df) > 10:
 
                         # cap only 100 rows
-                        if len(df) > 100:
-                            df = df.head(100)
+                        if len(df) > 200:
+                            df = df.head(200)
 
                         st.write("First 10 rows of data")
                         st.dataframe(df.head(10))
@@ -320,7 +320,8 @@ def stramlit_ui():
                     return None
         
                 # if should_generate_chart_cached(question=my_question, sql=sql, df=df):
-                if should_generate_chart:
+                # if should_generate_chart:
+                if True:
                     # plot_code = generate_plotly_code_cached(question=my_question, sql=sql, df=df)
                     try:
                         plot_code = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/generate_plotly_code_cached/', 
@@ -359,6 +360,7 @@ def stramlit_ui():
                     qlist = []
                     for message in st.session_state.chat_history_1:
                         qlist.append({'role': message['role'], 'content':message["content"]})
+                    print('qlist: ', qlist)
                     answer = requests.post(os.getenv('API_URL', 'http:/backend:8000')+'/api/v2/generate_answer_cached/', json={'question':  qlist}).json()['response']
                 except requests.exceptions.RequestException as e:
                     st.error(f"Error fetching data: {e}")

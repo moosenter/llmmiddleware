@@ -17,3 +17,5 @@ nginx/certs/*.key
 nginx/logs/
 data_storage/user_database
 *.mdf
+data_storage/*.csv
+data_storage/*.xlsx

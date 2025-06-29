@@ -8,3 +8,4 @@ pandas
 plotly
 pyjwt
 ujson
+xlsxwriter

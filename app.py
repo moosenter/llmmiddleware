@@ -11,6 +11,7 @@ from frontend.login import login_page, register_page, admin_page, admin_login_pa
 import glob 
 import io
 import ujson
+from io import BytesIO
 
 avatar_url = "frontend/assets/middleware_icon.png"
 st.set_page_config(page_title="LLM Middleware", layout="wide")
@@ -45,6 +46,34 @@ def writeResults():
         else:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
+
+def save_df(df):
+    # Let user specify a server‐side path (must exist or be creatable)
+    save_dir = os.path.join(os.getcwd(), "data_storage")
+    st.write(f"✅ Current working dir: `{os.getcwd()}`")  
+    st.write(f"📂 Files will be written into: `{save_dir}`")
+
+    st.markdown("---")
+    # --- Save to CSV on server ---
+    if st.button("💾 Save CSV to server", key='save_csv'):
+        csv_path = os.path.join(save_dir, "data.csv")
+        try:
+            df.to_csv(csv_path, index=False)
+            st.success(f"Saved CSV at `{csv_path}`")
+        except Exception as e:
+            st.error(f"Error saving CSV: {e}")
+
+    # --- Save to Excel on server ---
+    if st.button("💾 Save Excel to server", key='save_excel'):
+        excel_path = os.path.join(save_dir, "data.xlsx")
+        try:
+            with pd.ExcelWriter(excel_path, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+            st.success(f"Saved Excel at `{excel_path}`")
+        except Exception as e:
+            st.error(f"Error saving Excel: {e}")
+
+    st.markdown("---")
 
 def stramlit_ui():
     with open("config/ModelConfig.yaml", "r") as file:
@@ -297,30 +326,32 @@ def stramlit_ui():
                 if st.session_state.get("show_table", True):
                     st.write("### Query Results")
                     if len(df) > 10:
-
-                        # cap only 100 rows
-                        if len(df) > 200:
-                            df = df.head(200)
-
                         st.write("First 10 rows of data")
                         st.dataframe(df.head(10))
                     else:
                         st.dataframe(df)
                     st.session_state.chat_history_1.append({"role": "assistant", "content": "### Query Table", 'table':df})
+                    
+                save_df(df)
 
-                try:
-                    should_generate_chart = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/should_generate_chart_cached/', 
-                                    json={
-                                        'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
-                                        'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
-                                        'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
-                                    }).json()['response']
-                except requests.exceptions.RequestException as e:
-                    st.error(f"Error fetching data: {e}")
-                    return None
+                # try:
+                #     should_generate_chart = requests.post(os.getenv('API_URL', 'http://backend:8000')+'/api/v2/should_generate_chart_cached/', 
+                #                     json={
+                #                         'sql': orjson.dumps(sql, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                #                         'df': orjson.dumps(df.to_json(orient="records"), option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                #                         'question': orjson.dumps(my_question, option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS).decode("utf-8"),
+                #                     }).json()['response']
+                # except requests.exceptions.RequestException as e:
+                #     st.error(f"Error fetching data: {e}")
+                #     return None
         
                 # if should_generate_chart_cached(question=my_question, sql=sql, df=df):
                 # if should_generate_chart:
+
+                # cap only 100 rows
+                if len(df) > 200:
+                    df = df.head(200)
+
                 if True:
                     # plot_code = generate_plotly_code_cached(question=my_question, sql=sql, df=df)
                     try:
